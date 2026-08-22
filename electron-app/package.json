@@ -1,0 +1,49 @@
+{
+  "name": "mini-discord",
+  "productName": "Mini Discord",
+  "version": "1.0.0",
+  "description": "App desktop P2P de audio/video (2 usuarios) com WebRTC + Electron",
+  "main": "main.js",
+  "private": true,
+  "author": "Voce",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.7.5"
+  },
+  "devDependencies": {
+    "electron": "^31.3.1",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.pessoal.minidiscord",
+    "productName": "Mini Discord",
+    "files": [
+      "**/*",
+      "!**/{.gitignore,.env,.env.example}"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "mac": {
+      "category": "public.app-category.social-networking",
+      "target": ["dmg"],
+      "extendInfo": {
+        "NSCameraUsageDescription": "O Mini Discord precisa da camera para a chamada de video.",
+        "NSMicrophoneUsageDescription": "O Mini Discord precisa do microfone para a chamada de audio.",
+        "NSScreenCaptureDescription": "O Mini Discord precisa capturar a tela para o compartilhamento de tela."
+      }
+    },
+    "win": {
+      "target": ["nsis"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

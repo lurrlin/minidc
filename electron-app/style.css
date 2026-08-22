@@ -1,0 +1,461 @@
+/* =========================================================================
+   Mini Discord - Design tokens
+   Paleta: charcoal-ameixa quente (nao preto puro) + accent ambar.
+   O "sinal" visual do app: o contorno de cada video-tile acende suavemente
+   (cinza -> verde-sálvia) quando aquela pessoa esta falando, com base em
+   analise de volume em tempo real (Web Audio API). É a unica animação
+   com propósito no app - o resto fica quieto.
+   ========================================================================= */
+
+:root {
+  --bg: #16131d;
+  --surface: #1e1a28;
+  --surface-2: #262032;
+  --border: #322b40;
+  --border-soft: #241f2e;
+
+  --text: #f3efe7;
+  --text-dim: #a79fb5;
+  --text-faint: #6f6880;
+
+  --accent: #e8a33d;
+  --accent-soft: #f0c274;
+  --accent-ink: #241705;
+
+  --live: #7fb88f;
+  --live-glow: rgba(127, 184, 143, 0.45);
+
+  --danger: #e2596b;
+  --danger-soft: #f2828f;
+
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+
+  --font-display: 'Sora', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.screen {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+}
+
+button {
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 2px;
+}
+
+/* ============================= LOBBY ============================= */
+
+#lobby-screen {
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(60% 50% at 50% 0%, rgba(232, 163, 61, 0.08), transparent),
+    var(--bg);
+}
+
+.lobby-card {
+  width: 360px;
+  max-width: 88vw;
+  padding: 40px 32px 32px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  text-align: center;
+}
+
+.lobby-mark {
+  display: inline-flex;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+.lobby-mark .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+.lobby-mark .dot-a { background: var(--accent); }
+.lobby-mark .dot-b { background: var(--live); }
+
+.lobby-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 26px;
+  margin: 0 0 6px;
+  letter-spacing: -0.01em;
+}
+
+.lobby-subtitle {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin: 0 0 28px;
+}
+
+.lobby-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.room-input {
+  width: 100%;
+  padding: 13px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 15px;
+  text-align: center;
+  transition: border-color 120ms ease;
+}
+.room-input::placeholder { color: var(--text-faint); }
+.room-input:focus { border-color: var(--accent); }
+
+.btn {
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 13px 18px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-display);
+  transition: transform 100ms ease, opacity 100ms ease;
+}
+.btn:active { transform: scale(0.98); }
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.btn-primary:hover { background: var(--accent-soft); }
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.lobby-status {
+  min-height: 18px;
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: 18px 0 0;
+}
+.lobby-status[data-tone="error"] { color: var(--danger-soft); }
+.lobby-status[data-tone="ok"] { color: var(--live); }
+
+/* ============================= CALL SCREEN ============================= */
+
+#call-screen {
+  background: var(--bg);
+}
+
+.call-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 22px;
+  -webkit-app-region: drag;
+}
+
+.room-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.conn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+.conn-dot.conn-connecting { background: var(--accent); animation: pulse 1.4s ease-in-out infinite; }
+.conn-dot.conn-connected { background: var(--live); }
+.conn-dot.conn-lost { background: var(--danger); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.call-status {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.stage {
+  flex: 1;
+  position: relative;
+  padding: 0 22px 130px;
+  display: flex;
+}
+
+.video-tile {
+  position: relative;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 2px solid var(--border-soft);
+  transition: border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.video-tile video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transform: scaleX(-1); /* espelha a webcam, como qualquer app de video-chamada */
+}
+
+.video-tile.screen-share video {
+  object-fit: contain;
+  transform: none;
+  background: #000;
+}
+
+/* Assinatura visual: contorno acende quando a pessoa esta falando */
+.video-tile.is-speaking {
+  border-color: var(--live);
+  box-shadow: 0 0 0 3px var(--live-glow);
+}
+
+.video-tile-remote {
+  flex: 1;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.video-tile-local {
+  position: absolute;
+  right: 22px;
+  bottom: 22px;
+  width: 220px;
+  height: 140px;
+  z-index: 2;
+}
+
+.tile-label {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(22, 19, 29, 0.72);
+  color: var(--text);
+  backdrop-filter: blur(4px);
+}
+
+.tile-empty-state {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-faint);
+  font-size: 14px;
+  text-align: center;
+  padding: 20px;
+}
+
+#remote-video[data-empty="true"] ~ .tile-empty-state {
+  display: flex;
+}
+
+/* ============================= CONTROLS DOCK ============================= */
+
+.controls-dock {
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+
+.dock-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 68px;
+  padding: 10px 6px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-dim);
+  transition: background 120ms ease, color 120ms ease;
+}
+.dock-btn:hover { background: var(--surface-2); color: var(--text); }
+
+.dock-btn .icon { width: 22px; height: 22px; }
+.dock-btn-label { font-size: 11px; font-family: var(--font-body); }
+
+.dock-btn .icon-mic-off,
+.dock-btn .icon-cam-off { display: none; }
+
+.dock-btn[aria-pressed="true"] .icon-mic-on,
+.dock-btn[aria-pressed="true"] .icon-cam-on { display: none; }
+.dock-btn[aria-pressed="true"] .icon-mic-off,
+.dock-btn[aria-pressed="true"] .icon-cam-off { display: block; }
+.dock-btn[aria-pressed="true"] { background: var(--danger); color: #fff; }
+.dock-btn[aria-pressed="true"]:hover { background: var(--danger-soft); }
+
+#btn-share[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+
+.dock-btn-danger { color: var(--danger-soft); }
+.dock-btn-danger:hover { background: var(--danger); color: #fff; }
+
+/* ============================= SOURCE PICKER MODAL ============================= */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 8, 14, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.modal-card {
+  width: 620px;
+  max-width: 90vw;
+  max-height: 78vh;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.modal-header h2 {
+  font-family: var(--font-display);
+  font-size: 16px;
+  margin: 0;
+}
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 20px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+}
+.modal-close:hover { background: var(--surface-2); color: var(--text); }
+
+.source-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.source-option {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  text-align: left;
+  color: var(--text);
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+.source-option:hover { border-color: var(--accent); transform: translateY(-1px); }
+
+.source-option img {
+  width: 100%;
+  height: 96px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: #000;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.source-option-name {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================= TOAST ============================= */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 11px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  z-index: 20;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+.toast[data-tone="error"] { border-color: var(--danger); color: var(--danger-soft); }
+
+@media (max-width: 860px) {
+  .video-tile-local { width: 150px; height: 100px; right: 14px; bottom: 14px; }
+  .stage { padding: 0 14px 130px; }
+}
