@@ -61,6 +61,14 @@
   let isInitiator = false;
   let hasJoinedOnce = false;
   let pendingCandidates = [];
+  let pendingSignals = [];
+  let pendingPeerJoined = false;
+  let hasAnnouncedReady = false;
+  let remotePeerReady = false;
+  let processingSignals = false;
+  let videoTransceiver = null;
+  let offerRetryTimer = null;
+  let iceFailureTimer = null;
   let toastTimer = null;
   let reconnectTimer = null;
 
@@ -133,14 +141,29 @@
   }
 
   async function startLocalMedia() {
-    localStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-      video: { width: { ideal: 1280 }, height: { ideal: 720 } },
-    });
+    const audioConstraints = {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    };
+
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({
+        audio: audioConstraints,
+        video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+    } catch (videoError) {
+      // Duas instancias no mesmo PC podem disputar a mesma camera.
+      // Mantemos o audio para a chamada continuar mesmo sem video local.
+      console.warn('Camera indisponivel; tentando iniciar somente o audio:', videoError);
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints, video: false });
+        showToast('Camera ocupada. A chamada continuara somente com audio nesta janela.', 'info', 7000);
+      } catch (audioError) {
+        console.error('Nao foi possivel acessar camera/microfone:', audioError);
+        throw audioError;
+      }
+    }
 
     cameraTrack = localStream.getVideoTracks()[0];
     localVideo.srcObject = localStream;
@@ -154,18 +177,40 @@
     window.electronAPI.socketEmit('signal', { roomName: currentRoom, data });
   }
 
+  function serializeDescription(description) {
+    return description ? description.toJSON() : null;
+  }
+
+  async function renegotiateConnection() {
+    if (!pc || !isInitiator || pc.signalingState !== 'stable') return;
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      sendSignal({ type: 'offer', sdp: serializeDescription(pc.localDescription) });
+    } catch (err) {
+      console.error('Erro renegociando midia:', err);
+      showToast(`Falha ao atualizar a midia: ${err.message || err}`, 'error', 9000);
+    }
+  }
+
   function wireSocketEvents() {
     window.electronAPI.socketOn('connect', () => {
       // Cobre tanto a primeira conexao quanto reconexoes automaticas do
       // socket.io depois de uma queda de rede (o server nao lembra do
       // socket.id antigo, entao precisamos re-anunciar a sala).
-      if (currentRoom) {
+      if (currentRoom && hasJoinedOnce) {
         window.electronAPI.socketEmit('join-room', currentRoom);
       }
     });
 
     window.electronAPI.socketOn('disconnect', () => {
       if (hasJoinedOnce) setConnectionState('lost');
+    });
+
+    window.electronAPI.socketOn('connect_error', (err) => {
+      setLobbyStatus('Nao foi possivel conectar ao servidor.', 'error');
+      joinButton.disabled = false;
+      showToast(`Erro de conexao: ${err?.message || 'verifique sua internet.'}`, 'error', 6000);
     });
 
     window.electronAPI.socketOn('join-error', (message) => {
@@ -188,6 +233,7 @@
         // Primeira vez entrando nesta sessao do app: pega a midia local
         // e cria a PeerConnection. Em reconexoes, so re-anunciamos a sala
         // (o pc so e recriado se realmente caiu, ver onconnectionstatechange).
+        goToCallScreen(roomName);
         try {
           await startLocalMedia();
         } catch (err) {
@@ -196,7 +242,18 @@
           return;
         }
         createPeerConnection();
-        goToCallScreen(roomName);
+        await drainSignals();
+
+        if (pendingPeerJoined && isInitiator) {
+          pendingPeerJoined = false;
+          await createOffer();
+        }
+
+        if (!hasAnnouncedReady) {
+          hasAnnouncedReady = true;
+          sendSignal({ type: 'ready' });
+        }
+
       }
 
       setConnectionState('connecting');
@@ -204,19 +261,44 @@
     });
 
     window.electronAPI.socketOn('peer-joined', async () => {
-      // So chega aqui pra quem JA estava na sala (o servidor garante isso) -
-      // por convencao, quem ja estava e quem cria a offer.
-      if (!pc) return;
-      try {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        sendSignal({ type: 'offer', sdp: pc.localDescription });
-      } catch (err) {
-        console.error('Erro criando offer:', err);
+      pendingPeerJoined = true;
+      if (pc && isInitiator) {
+        pendingPeerJoined = false;
+        await createOffer();
       }
     });
 
+    async function createOffer() {
+      if (!pc) return;
+      if (pc.signalingState !== 'stable') return;
+      try {
+        clearTimeout(offerRetryTimer);
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        sendSignal({ type: 'offer', sdp: serializeDescription(pc.localDescription) });
+      } catch (err) {
+        console.error('Erro criando offer:', err);
+      }
+    }
+
     window.electronAPI.socketOn('signal', async (data) => {
+      pendingSignals.push(data);
+      await drainSignals();
+    });
+
+    async function drainSignals() {
+      if (processingSignals || !pc) return;
+      processingSignals = true;
+      try {
+        while (pc && pendingSignals.length) {
+          await processSignal(pendingSignals.shift());
+        }
+      } finally {
+        processingSignals = false;
+      }
+    }
+
+    async function processSignal(data) {
       if (!pc) return;
 
       try {
@@ -225,21 +307,30 @@
           await flushPendingCandidates();
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
-          sendSignal({ type: 'answer', sdp: pc.localDescription });
+          sendSignal({ type: 'answer', sdp: serializeDescription(pc.localDescription) });
         } else if (data.type === 'answer') {
           await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
           await flushPendingCandidates();
+        } else if (data.type === 'ready' && isInitiator) {
+          await createOffer();
         } else if (data.type === 'candidate' && data.candidate) {
           if (pc.remoteDescription && pc.remoteDescription.type) {
             await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
           } else {
             pendingCandidates.push(data.candidate);
           }
+        } else if (data.type === 'screen-share-start') {
+          remoteTile.classList.add('screen-share');
+        } else if (data.type === 'screen-share-stop') {
+          remoteTile.classList.remove('screen-share');
+        } else if (data.type === 'renegotiate' && isInitiator) {
+          await renegotiateConnection();
         }
       } catch (err) {
-        console.error('Erro processando sinal:', err);
+        console.error('Erro processando sinal:', data.type, err);
+        showToast(`Falha no sinal ${data.type}: ${err.message || err}`, 'error', 9000);
       }
-    });
+    }
 
     window.electronAPI.socketOn('peer-left', () => {
       showToast('A outra pessoa saiu da sala.', 'info');
@@ -282,15 +373,17 @@
     // Reanexa as tracks locais atuais (camera ligada/desligada, tela
     // compartilhada ou nao) a nova conexao.
     localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+    videoTransceiver = pc.getTransceivers().find((transceiver) => transceiver.sender.track?.kind === 'video');
+    if (!videoTransceiver) videoTransceiver = pc.addTransceiver('video', { direction: 'sendrecv' });
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        sendSignal({ type: 'candidate', candidate: event.candidate });
+        sendSignal({ type: 'candidate', candidate: event.candidate.toJSON() });
       }
     };
 
     pc.ontrack = (event) => {
-      const [stream] = event.streams;
+      const stream = event.streams[0] || new MediaStream([event.track]);
       remoteVideo.srcObject = stream;
       remoteVideo.dataset.empty = 'false';
       attachSpeakingIndicator(stream, remoteTile);
@@ -302,6 +395,8 @@
 
       if (pc.connectionState === 'connected') {
         clearTimeout(reconnectTimer);
+        clearTimeout(offerRetryTimer);
+        clearTimeout(iceFailureTimer);
         setConnectionState('connected');
       } else if (pc.connectionState === 'disconnected') {
         setConnectionState('lost');
@@ -312,6 +407,23 @@
       } else if (pc.connectionState === 'failed') {
         setConnectionState('lost');
         attemptIceRestart();
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      if (!pc) return;
+      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        clearTimeout(iceFailureTimer);
+      } else if (pc.iceConnectionState === 'failed') {
+        showToast('A rede bloqueou a conexao direta. Tentando novamente...', 'error', 7000);
+        attemptIceRestart();
+      } else if (pc.iceConnectionState === 'checking') {
+        clearTimeout(iceFailureTimer);
+        iceFailureTimer = setTimeout(() => {
+          if (pc && pc.iceConnectionState === 'checking') {
+            showToast('A conexao esta bloqueada pela rede. Tente outra rede.', 'error', 9000);
+          }
+        }, 12000);
       }
     };
 
@@ -423,15 +535,18 @@
 
     // O coracao da troca: substitui a track de video no sender existente,
     // sem precisar renegociar a offer/answer.
-    const sender = pc && pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+    const sender = pc && (videoTransceiver?.sender || pc.getSenders().find((s) => s.track?.kind === 'video'));
     if (sender) await sender.replaceTrack(screenTrack);
 
     // Preview local passa a mostrar a tela compartilhada.
     localVideo.srcObject = screenStream;
     localTile.classList.add('screen-share');
     localTileLabel.textContent = 'sua tela';
+    sendSignal({ type: 'screen-share-start' });
 
     btnShare.setAttribute('aria-pressed', 'true');
+    sendSignal({ type: 'renegotiate' });
+    await renegotiateConnection();
 
     // Se o usuario parar o compartilhamento pelo controle nativo do SO
     // (ex: barra "Parar de compartilhar" do Windows/macOS), voltamos pra
@@ -445,13 +560,16 @@
     screenStream.getTracks().forEach((t) => t.stop());
     screenStream = null;
 
-    const sender = pc && pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+    const sender = pc && (videoTransceiver?.sender || pc.getSenders().find((s) => s.track?.kind === 'video'));
     if (sender && cameraTrack) await sender.replaceTrack(cameraTrack);
 
     localVideo.srcObject = localStream;
     localTile.classList.remove('screen-share');
     localTileLabel.textContent = 'voce';
     btnShare.setAttribute('aria-pressed', 'false');
+    sendSignal({ type: 'screen-share-stop' });
+    sendSignal({ type: 'renegotiate' });
+    await renegotiateConnection();
   }
 
   function leaveCall() {
@@ -470,7 +588,13 @@
     isInitiator = false;
     hasJoinedOnce = false;
     pendingCandidates = [];
-
+    pendingSignals = [];
+    pendingPeerJoined = false;
+    remotePeerReady = false;
+    processingSignals = false;
+    videoTransceiver = null;
+    clearTimeout(offerRetryTimer);
+    clearTimeout(iceFailureTimer);
     remoteVideo.srcObject = null;
     remoteVideo.dataset.empty = 'true';
     localVideo.srcObject = null;
@@ -479,6 +603,7 @@
     btnShare.setAttribute('aria-pressed', 'false');
     localTile.classList.remove('screen-share');
     localTileLabel.textContent = 'voce';
+    remoteTile.classList.remove('screen-share');
 
     goToLobbyScreen();
   }
@@ -497,11 +622,11 @@
     // IMPORTANTE: socketConnect() precisa vir antes de wireSocketEvents(),
     // porque o wrapper exposto pelo preload so consegue registrar listeners
     // (socketOn) depois que o objeto `socket` existe do lado do preload.
+    currentRoom = roomName;
     window.electronAPI.socketConnect(CONFIG.SIGNALING_SERVER_URL);
     wireSocketEvents();
+    // O Socket.IO enfileira este evento se a conexao ainda estiver abrindo.
     window.electronAPI.socketEmit('join-room', roomName);
-    // O restante do fluxo continua nos handlers registrados em wireSocketEvents().
-    currentRoom = roomName;
   });
 
   function escapeHtml(str) {

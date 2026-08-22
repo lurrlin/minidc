@@ -69,6 +69,10 @@ body {
   flex-direction: column;
 }
 
+.screen[hidden] {
+  display: none;
+}
+
 button {
   font-family: var(--font-body);
   cursor: pointer;
@@ -363,6 +367,10 @@ input:focus-visible {
   align-items: center;
   justify-content: center;
   z-index: 10;
+}
+
+.modal-overlay[hidden] {
+  display: none;
 }
 
 .modal-card {

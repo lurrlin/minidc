@@ -9,7 +9,7 @@
 window.APP_CONFIG = {
   // Troque pela URL publica do seu signaling server depois do deploy.
   // Durante o desenvolvimento local, deixe como esta (server.js na porta 3000).
-  SIGNALING_SERVER_URL: 'http://localhost:3000',
+  SIGNALING_SERVER_URL: 'https://minidc-vn9a.onrender.com',
 
   // Configuracao ICE do WebRTC. STUN publico do Google resolve a maioria
   // das redes domesticas. Se, depois de testar, a chamada nunca conectar

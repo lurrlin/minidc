@@ -1,7 +1,7 @@
 {
   "name": "mini-discord",
   "productName": "Mini Discord",
-  "version": "1.0.0",
+  "version": "1.1.2",
   "description": "App desktop P2P de audio/video (2 usuarios) com WebRTC + Electron",
   "main": "main.js",
   "private": true,

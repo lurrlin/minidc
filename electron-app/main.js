@@ -32,7 +32,9 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true,
+      // O preload carrega socket.io-client, que precisa do require do Node.
+      // O isolamento continua protegido por contextIsolation e nodeIntegration false.
+      sandbox: false,
     },
   });
 
