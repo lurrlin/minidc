@@ -1,11 +1,11 @@
 {
   "name": "unme",
   "productName": "unme",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "description": "App desktop P2P de audio/video (2 usuarios) com WebRTC + Electron",
   "main": "main.js",
   "private": true,
-  "author": "Voce",
+  "author": "lurrlin",
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder",
@@ -43,6 +43,7 @@
       }
     },
     "win": {
+      "publisherName": "lurrlin",
       "target": [
         "nsis"
       ]

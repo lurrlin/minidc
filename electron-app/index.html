@@ -22,7 +22,16 @@
       <h1 class="lobby-title">Unme</h1>
       <p class="lobby-subtitle">Apenas dois. Entre na sua sala privada.</p>
 
-      <form id="join-form" class="lobby-form">
+      <div class="lobby-actions">
+        <button id="create-room-button" class="btn btn-primary" type="button">
+          Criar sala
+        </button>
+        <button id="show-join-button" class="btn btn-secondary" type="button">
+          Entrar em uma sala
+        </button>
+      </div>
+
+      <form id="join-form" class="lobby-form" hidden>
         <label for="room-input" class="sr-only">Nome da sala</label>
         <input
           id="room-input"
@@ -39,6 +48,14 @@
         </button>
       </form>
 
+      <div id="created-room" class="created-room" hidden>
+        <span class="created-room-label">Código da sala</span>
+        <div class="created-room-row">
+          <code id="created-room-code"></code>
+          <button id="copy-room-button" class="btn btn-secondary" type="button">Copiar</button>
+        </div>
+      </div>
+
       <p id="lobby-status" class="lobby-status" role="status" aria-live="polite"></p>
     </section>
   </main>
@@ -49,6 +66,10 @@
       <div class="room-badge">
         <span id="connection-dot" class="conn-dot conn-connecting"></span>
         <span id="room-label" class="room-label">sala</span>
+      </div>
+      <div class="active-room-code">
+        <code id="active-room-code"></code>
+        <button id="copy-active-room" type="button" aria-label="Copiar código da sala">Copiar</button>
       </div>
       <span id="call-status" class="call-status">conectando...</span>
     </header>
@@ -61,7 +82,7 @@
         <div class="tile-empty-state" id="remote-empty">
           <span>esperando a outra pessoa entrar...</span>
         </div>
-        <span class="tile-label">ela</span>
+        <span class="tile-label">user</span>
         <div class="video-actions">
           <button id="btn-fullscreen" type="button">Tela cheia</button>
         </div>
@@ -73,7 +94,7 @@
       <div class="video-tile video-tile-local video-square" id="local-tile">
         <div class="avatar" id="local-avatar" aria-label="Seu avatar">V</div>
         <video id="local-video" autoplay playsinline muted></video>
-        <span class="tile-label" id="local-tile-label">voce</span>
+        <span class="tile-label" id="local-tile-label">user</span>
       </div>
     </section>
 
@@ -111,7 +132,7 @@
       </div>
       <label class="screen-audio-option">
         <input id="include-system-audio" type="checkbox" />
-        <span>Incluir áudio do computador</span>
+        <span>Compartilhar Áudio</span>
       </label>
       <div id="source-grid" class="source-grid"></div>
       <button id="stop-screen-share" class="stop-share-button" type="button" hidden>Parar compartilhamento</button>

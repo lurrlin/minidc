@@ -91,6 +91,16 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('check-room', (roomNameRaw) => {
+    const roomName = String(roomNameRaw || '').trim();
+    const size = roomSize(roomName);
+    socket.emit('room-check-result', {
+      roomName,
+      exists: size > 0,
+      available: size < 2,
+    });
+  });
+
   // Repassa qualquer mensagem de sinalizacao (offer, answer ou ICE candidate)
   // para o outro peer da mesma sala. O "shape" do payload e definido pelo
   // cliente (renderer.js); o servidor so encaminha, sem inspecionar.

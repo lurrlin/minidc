@@ -38,6 +38,8 @@
 
 * { box-sizing: border-box; }
 
+[hidden] { display: none !important; }
+
 html, body {
   height: 100%;
   margin: 0;
@@ -137,6 +139,26 @@ input:focus-visible {
   gap: 10px;
 }
 
+.lobby-actions { display: grid; gap: 10px; }
+.btn-secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { border-color: var(--accent); color: var(--accent-soft); }
+.created-room { margin-top: 22px; text-align: left; }
+.created-room-label { display: block; color: var(--text-dim); font-size: 12px; margin-bottom: 7px; }
+.created-room-row { display: flex; align-items: center; gap: 8px; }
+.created-room code {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--accent-soft);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .room-input {
   width: 100%;
   padding: 13px 16px;
@@ -228,12 +250,28 @@ input:focus-visible {
   color: var(--text-dim);
 }
 
+.active-room-code { display: flex; align-items: center; gap: 7px; margin-left: auto; margin-right: 16px; }
+.active-room-code code { color: var(--accent-soft); font-size: 12px; }
+.active-room-code button {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 5px 8px;
+  background: var(--surface);
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.active-room-code button:hover { border-color: var(--accent); color: var(--accent-soft); }
+
 .stage {
   flex: 1;
   position: relative;
   padding: 0 22px 130px;
   display: flex;
 }
+
+.stage.compact-layout { align-items: center; justify-content: center; gap: 24px; }
+.stage.compact-layout .video-tile-remote,
+.stage.compact-layout .video-tile-local { position: relative; inset: auto; margin: 0; }
 
 .video-tile {
   position: relative;

@@ -27,11 +27,19 @@
   const joinForm = document.getElementById('join-form');
   const roomInput = document.getElementById('room-input');
   const joinButton = document.getElementById('join-button');
+  const createRoomButton = document.getElementById('create-room-button');
+  const showJoinButton = document.getElementById('show-join-button');
+  const createdRoom = document.getElementById('created-room');
+  const createdRoomCode = document.getElementById('created-room-code');
+  const copyRoomButton = document.getElementById('copy-room-button');
   const lobbyStatus = document.getElementById('lobby-status');
 
   const connectionDot = document.getElementById('connection-dot');
   const roomLabel = document.getElementById('room-label');
+  const activeRoomCode = document.getElementById('active-room-code');
+  const copyActiveRoomButton = document.getElementById('copy-active-room');
   const callStatus = document.getElementById('call-status');
+  const stage = document.querySelector('.stage');
 
   const remoteVideo = document.getElementById('remote-video');
   const remoteAudio = document.getElementById('remote-audio');
@@ -64,6 +72,10 @@
   let screenStream = null;
   let screenAudioTrack = null;
   let screenAudioTransceiver = null;
+  let nativeAudioContext = null;
+  let nativeAudioNode = null;
+  let nativeAudioDestination = null;
+  let nativeAudioCleanup = null;
   let pc = null;
   let currentRoom = null;
   let isInitiator = false;
@@ -81,6 +93,7 @@
   let renegotiationInProgress = false;
   let toastTimer = null;
   let reconnectTimer = null;
+  let roomCheckResolver = null;
 
   // ---------------------------------------------------------------------
   // Utilitarios de UI
@@ -112,6 +125,7 @@
     lobbyScreen.hidden = true;
     callScreen.hidden = false;
     roomLabel.textContent = roomName;
+    activeRoomCode.textContent = roomName;
   }
 
   function goToLobbyScreen() {
@@ -119,6 +133,33 @@
     lobbyScreen.hidden = false;
     joinButton.disabled = false;
     setLobbyStatus('');
+    joinForm.hidden = true;
+    createRoomButton.hidden = false;
+    showJoinButton.hidden = false;
+    createdRoom.hidden = true;
+  }
+
+  function updateTileLayout() {
+    const compact = !remoteTile.classList.contains('has-video') && !localTile.classList.contains('has-video');
+    stage.classList.toggle('compact-layout', compact);
+  }
+
+  updateTileLayout();
+
+  function generateRoomCode() {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*+-=';
+    const values = new Uint32Array(16);
+    crypto.getRandomValues(values);
+    return Array.from(values, (value) => alphabet[value % alphabet.length]).join('');
+  }
+
+  async function copyRoomCode() {
+    try {
+      await navigator.clipboard.writeText(createdRoomCode.textContent || activeRoomCode.textContent);
+      showToast('Codigo copiado.', 'info', 2500);
+    } catch (err) {
+      showToast('Nao foi possivel copiar o codigo.', 'error');
+    }
   }
 
   // ---------------------------------------------------------------------
@@ -196,13 +237,76 @@
       videoTransceiver.sender.replaceTrack(cameraTrack);
       localVideo.srcObject = localStream;
       localTile.classList.add('has-video', 'video-square');
+      updateTileLayout();
       btnCamera.setAttribute('aria-pressed', 'true');
-      sendSignal({ type: 'renegotiate' });
-      await renegotiateConnection();
     } catch (err) {
       showToast('Nao foi possivel ligar a camera.', 'error');
       console.error(err);
     }
+  }
+
+  async function startNativeAudioCapture(pid) {
+    if (!pid || !window.electronAPI.startNativeAudio) return null;
+
+    nativeAudioContext = new AudioContext({ sampleRate: 48000 });
+    await nativeAudioContext.audioWorklet.addModule(URL.createObjectURL(new Blob([`
+      class WasapiProcessor extends AudioWorkletProcessor {
+        constructor() {
+          super();
+          this.chunks = [];
+          this.offset = 0;
+          this.port.onmessage = (event) => this.chunks.push(event.data);
+        }
+        process(_inputs, outputs) {
+          const output = outputs[0];
+          for (let frame = 0; frame < output[0].length; frame += 1) {
+            const chunk = this.chunks[0];
+            if (!chunk) {
+              output[0][frame] = 0;
+              output[1][frame] = 0;
+              continue;
+            }
+            const sampleIndex = this.offset * 2;
+            output[0][frame] = chunk[sampleIndex] || 0;
+            output[1][frame] = chunk[sampleIndex + 1] || output[0][frame];
+            this.offset += 1;
+            if (this.offset * 2 >= chunk.length) {
+              this.chunks.shift();
+              this.offset = 0;
+            }
+          }
+          return true;
+        }
+      }
+      registerProcessor('wasapi-processor', WasapiProcessor);
+    `], { type: 'application/javascript' })));
+
+    nativeAudioNode = new AudioWorkletNode(nativeAudioContext, 'wasapi-processor', {
+      numberOfInputs: 0,
+      numberOfOutputs: 1,
+      outputChannelCount: [2],
+    });
+    nativeAudioDestination = nativeAudioContext.createMediaStreamDestination();
+    nativeAudioNode.connect(nativeAudioDestination);
+    nativeAudioCleanup = window.electronAPI.onNativeAudioData((packet) => {
+      const bytes = packet.data instanceof Uint8Array ? packet.data : new Uint8Array(packet.data);
+      const samples = new Float32Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 4)).slice();
+      nativeAudioNode?.port.postMessage(samples, [samples.buffer]);
+    });
+    await window.electronAPI.startNativeAudio(pid);
+    await nativeAudioContext.resume();
+    return nativeAudioDestination.stream.getAudioTracks()[0];
+  }
+
+  async function stopNativeAudioCapture() {
+    nativeAudioCleanup?.();
+    nativeAudioCleanup = null;
+    await window.electronAPI.stopNativeAudio?.();
+    nativeAudioNode?.disconnect();
+    nativeAudioContext?.close();
+    nativeAudioNode = null;
+    nativeAudioDestination = null;
+    nativeAudioContext = null;
   }
 
   // ---------------------------------------------------------------------
@@ -240,6 +344,10 @@
   }
 
   function wireSocketEvents() {
+    window.electronAPI.socketOn('room-check-result', (result) => {
+      roomCheckResolver?.(result);
+      roomCheckResolver = null;
+    });
     window.electronAPI.socketOn('connect', () => {
       // Cobre tanto a primeira conexao quanto reconexoes automaticas do
       // socket.io depois de uma queda de rede (o server nao lembra do
@@ -434,6 +542,7 @@
         remoteVideo.srcObject = new MediaStream([event.track]);
         remoteVideo.dataset.empty = 'false';
         remoteTile.classList.add('has-video', 'video-square');
+        updateTileLayout();
         remoteVideo.play().catch(() => {});
       } else if (event.track.kind === 'audio') {
         const audioTracks = remoteAudio.srcObject?.getAudioTracks() || [];
@@ -582,7 +691,7 @@
       `;
       btn.addEventListener('click', () => {
         closeSourcePicker();
-        startScreenShare(source.id, includeSystemAudio.checked);
+        startScreenShare(source.id, includeSystemAudio.checked, source.nativeAudioPid);
       });
       sourceGrid.appendChild(btn);
     });
@@ -603,11 +712,13 @@
     if (e.key === 'Escape' && !sourceModal.hidden) closeSourcePicker();
   });
 
-  async function startScreenShare(sourceId, includeAudio = false) {
+  async function startScreenShare(sourceId, includeAudio = false, nativeAudioPid = null) {
     const previousScreenStream = screenStream;
+    const useNativeAudio = includeAudio && nativeAudioPid && window.electronAPI.startNativeAudio;
+    let nextScreenStream;
     try {
-      const nextScreenStream = await navigator.mediaDevices.getUserMedia({
-        audio: includeAudio ? {
+      nextScreenStream = await navigator.mediaDevices.getUserMedia({
+        audio: useNativeAudio ? false : includeAudio ? {
           mandatory: {
             chromeMediaSource: 'desktop',
             chromeMediaSourceId: sourceId,
@@ -631,7 +742,27 @@
     }
 
     const screenTrack = screenStream.getVideoTracks()[0];
-    screenAudioTrack = screenStream.getAudioTracks()[0] || null;
+    if (useNativeAudio) {
+      try {
+        screenAudioTrack = await startNativeAudioCapture(nativeAudioPid);
+      } catch (nativeError) {
+        console.warn('WASAPI falhou; usando audio de sistema como fallback:', nativeError);
+        await stopNativeAudioCapture();
+        try {
+          const fallbackAudio = await navigator.mediaDevices.getUserMedia({
+            audio: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: sourceId } },
+            video: false,
+          });
+          screenAudioTrack = fallbackAudio.getAudioTracks()[0] || null;
+          if (screenAudioTrack) screenStream.addTrack(screenAudioTrack);
+        } catch (fallbackError) {
+          console.warn('Fallback de audio de sistema tambem falhou:', fallbackError);
+          screenAudioTrack = null;
+        }
+      }
+    } else {
+      screenAudioTrack = screenStream.getAudioTracks()[0] || null;
+    }
 
     // O coracao da troca: substitui a track de video no sender existente,
     // sem precisar renegociar a offer/answer.
@@ -651,13 +782,12 @@
     localVideo.srcObject = screenStream;
     localTile.classList.add('screen-share');
     localTile.classList.add('has-video', 'video-square');
+    updateTileLayout();
     localTileLabel.textContent = 'sua tela';
     sendSignal({ type: 'screen-share-start' });
 
     btnShare.setAttribute('aria-pressed', 'true');
     stopScreenShareButton.hidden = false;
-    sendSignal({ type: 'renegotiate' });
-    await renegotiateConnection();
 
     // Se o usuario parar o compartilhamento pelo controle nativo do SO
     // (ex: barra "Parar de compartilhar" do Windows/macOS), voltamos pra
@@ -674,6 +804,7 @@
     screenStream = null;
     stopScreenShareButton.hidden = true;
     if (screenAudioTransceiver) await screenAudioTransceiver.sender.replaceTrack(null);
+    await stopNativeAudioCapture();
     screenAudioTrack = null;
 
     const sender = pc && (videoTransceiver?.sender || pc.getSenders().find((s) => s.track?.kind === 'video'));
@@ -682,11 +813,10 @@
     localVideo.srcObject = localStream;
     localTile.classList.remove('screen-share');
     localTile.classList.toggle('has-video', Boolean(cameraTrack));
-    localTileLabel.textContent = 'voce';
+    updateTileLayout();
+    localTileLabel.textContent = 'user';
     btnShare.setAttribute('aria-pressed', 'false');
     sendSignal({ type: 'screen-share-stop' });
-    sendSignal({ type: 'renegotiate' });
-    await renegotiateConnection();
   }
 
   function leaveCall() {
@@ -695,6 +825,7 @@
 
     if (screenStream) screenStream.getTracks().forEach((t) => t.stop());
     if (localStream) localStream.getTracks().forEach((t) => t.stop());
+    stopNativeAudioCapture().catch(() => {});
     if (pc) pc.close();
 
     pc = null;
@@ -721,8 +852,10 @@
     btnCamera.setAttribute('aria-pressed', 'false');
     btnShare.setAttribute('aria-pressed', 'false');
     localTile.classList.remove('screen-share');
-    localTileLabel.textContent = 'voce';
+    localTileLabel.textContent = 'user';
     remoteTile.classList.remove('screen-share');
+    remoteTile.classList.remove('has-video');
+    updateTileLayout();
 
     goToLobbyScreen();
   }
@@ -730,9 +863,7 @@
   // ---------------------------------------------------------------------
   // Lobby: entrar na sala
   // ---------------------------------------------------------------------
-  joinForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const roomName = roomInput.value.trim();
+  async function beginJoin(roomName, verifyRoom = false) {
     if (!roomName) return;
 
     joinButton.disabled = true;
@@ -744,8 +875,57 @@
     currentRoom = roomName;
     window.electronAPI.socketConnect(CONFIG.SIGNALING_SERVER_URL);
     wireSocketEvents();
+    if (verifyRoom) {
+      const roomResult = await new Promise((resolve) => {
+        roomCheckResolver = resolve;
+        window.electronAPI.socketEmit('check-room', roomName);
+      });
+      if (!roomResult.exists) {
+        window.electronAPI.socketDisconnect();
+        currentRoom = null;
+        joinButton.disabled = false;
+        setLobbyStatus('Essa sala nao existe.', 'error');
+        return;
+      }
+      if (!roomResult.available) {
+        window.electronAPI.socketDisconnect();
+        currentRoom = null;
+        joinButton.disabled = false;
+        setLobbyStatus('Essa sala ja esta cheia.', 'error');
+        return;
+      }
+    }
     // O Socket.IO enfileira este evento se a conexao ainda estiver abrindo.
     window.electronAPI.socketEmit('join-room', roomName);
+  }
+
+  joinForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await beginJoin(roomInput.value.trim(), true);
+  });
+
+  createRoomButton.addEventListener('click', async () => {
+    const roomCode = generateRoomCode();
+    createdRoomCode.textContent = roomCode;
+    createdRoom.hidden = false;
+    await beginJoin(roomCode);
+  });
+
+  showJoinButton.addEventListener('click', () => {
+    joinForm.hidden = false;
+    showJoinButton.hidden = true;
+    createRoomButton.hidden = true;
+    roomInput.focus();
+  });
+
+  copyRoomButton.addEventListener('click', copyRoomCode);
+  copyActiveRoomButton.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(activeRoomCode.textContent);
+      showToast('Codigo copiado.', 'info', 2500);
+    } catch (err) {
+      showToast('Nao foi possivel copiar o codigo.', 'error');
+    }
   });
 
   function escapeHtml(str) {
