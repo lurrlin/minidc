@@ -46,6 +46,9 @@
         <button id="join-button" class="btn btn-primary" type="submit">
           Entrar na sala
         </button>
+        <button id="back-to-lobby-button" class="btn btn-secondary" type="button">
+          Voltar
+        </button>
       </form>
 
       <div id="created-room" class="created-room" hidden>
@@ -76,7 +79,7 @@
 
     <section class="stage">
       <div class="video-tile video-tile-remote video-square" id="remote-tile">
-        <div class="avatar" id="remote-avatar" aria-label="Avatar da outra pessoa">E</div>
+        <div class="avatar" id="remote-avatar" aria-label="Avatar da outra pessoa">:)</div>
         <video id="remote-video" autoplay playsinline data-empty="true"></video>
         <audio id="remote-audio" autoplay></audio>
         <div class="tile-empty-state" id="remote-empty">
@@ -88,17 +91,25 @@
         </div>
         <div id="remote-context-menu" class="context-menu" hidden>
           <button id="btn-remote-mute" type="button">Mutar live</button>
+          <label class="context-volume" for="remote-volume">
+            <span>Volume <output id="remote-volume-value">100%</output></span>
+            <input id="remote-volume" type="range" min="0" max="200" value="100" step="1" />
+          </label>
         </div>
       </div>
 
       <div class="video-tile video-tile-local video-square" id="local-tile">
-        <div class="avatar" id="local-avatar" aria-label="Seu avatar">V</div>
+        <div class="avatar" id="local-avatar" aria-label="Seu avatar">:)</div>
         <video id="local-video" autoplay playsinline muted></video>
         <span class="tile-label" id="local-tile-label">user</span>
       </div>
     </section>
 
     <footer class="controls-dock">
+      <label class="mic-picker" for="microphone-select">
+        <span>Microfone</span>
+        <select id="microphone-select"></select>
+      </label>
       <button id="btn-mute" class="dock-btn" type="button" aria-pressed="false" aria-label="Mutar microfone">
         <svg class="icon icon-mic-on" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Z" stroke="currentColor" stroke-width="1.8"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         <svg class="icon icon-mic-off" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V9m0-3a3 3 0 0 0-6 0v6c0 .4.06.78.17 1.14M19 11a7 7 0 0 1-1.68 4.56M12 18v3M3 3l18 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>

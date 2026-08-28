@@ -29,6 +29,7 @@
   const joinButton = document.getElementById('join-button');
   const createRoomButton = document.getElementById('create-room-button');
   const showJoinButton = document.getElementById('show-join-button');
+  const backToLobbyButton = document.getElementById('back-to-lobby-button');
   const createdRoom = document.getElementById('created-room');
   const createdRoomCode = document.getElementById('created-room-code');
   const copyRoomButton = document.getElementById('copy-room-button');
@@ -55,6 +56,9 @@
   const btnCamera = document.getElementById('btn-camera');
   const btnShare = document.getElementById('btn-share');
   const btnLeave = document.getElementById('btn-leave');
+  const microphoneSelect = document.getElementById('microphone-select');
+  const remoteVolume = document.getElementById('remote-volume');
+  const remoteVolumeValue = document.getElementById('remote-volume-value');
 
   const sourceModal = document.getElementById('source-modal');
   const sourceModalClose = document.getElementById('source-modal-close');
@@ -76,6 +80,9 @@
   let nativeAudioNode = null;
   let nativeAudioDestination = null;
   let nativeAudioCleanup = null;
+  let remoteVolumeContext = null;
+  let remoteVolumeGain = null;
+  let remoteVolumeSource = null;
   let pc = null;
   let currentRoom = null;
   let isInitiator = false;
@@ -94,6 +101,7 @@
   let toastTimer = null;
   let reconnectTimer = null;
   let roomCheckResolver = null;
+  let selectedMicrophoneId = '';
 
   // ---------------------------------------------------------------------
   // Utilitarios de UI
@@ -104,6 +112,20 @@
     toastEl.dataset.tone = tone;
     toastEl.hidden = false;
     toastTimer = setTimeout(() => { toastEl.hidden = true; }, duration);
+  }
+
+  function ensureRemoteVolumeGain() {
+    if (remoteVolumeGain) return;
+    try {
+      remoteVolumeContext = new AudioContext();
+      remoteVolumeSource = remoteVolumeContext.createMediaElementSource(remoteAudio);
+      remoteVolumeGain = remoteVolumeContext.createGain();
+      remoteVolumeSource.connect(remoteVolumeGain);
+      remoteVolumeGain.connect(remoteVolumeContext.destination);
+    } catch (err) {
+      console.warn('Controle de ganho ampliado indisponivel:', err);
+      remoteVolumeGain = null;
+    }
   }
 
   function setLobbyStatus(message, tone = 'info') {
@@ -133,10 +155,16 @@
     lobbyScreen.hidden = false;
     joinButton.disabled = false;
     setLobbyStatus('');
+    resetLobbyMode();
+  }
+
+  function resetLobbyMode() {
     joinForm.hidden = true;
     createRoomButton.hidden = false;
     showJoinButton.hidden = false;
     createdRoom.hidden = true;
+    roomInput.value = '';
+    createdRoomCode.textContent = '';
   }
 
   function updateTileLayout() {
@@ -200,7 +228,7 @@
 
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
-        audio: audioConstraints,
+        audio: selectedMicrophoneId ? { ...audioConstraints, deviceId: { exact: selectedMicrophoneId } } : audioConstraints,
         video: false,
       });
     } catch (videoError) {
@@ -219,6 +247,48 @@
     cameraTrack = null;
     localVideo.srcObject = localStream;
     attachSpeakingIndicator(localStream, localTile);
+    await refreshMicrophones();
+  }
+
+  async function refreshMicrophones() {
+    const devices = (await navigator.mediaDevices.enumerateDevices())
+      .filter((device) => device.kind === 'audioinput');
+    microphoneSelect.innerHTML = '';
+    devices.forEach((device, index) => {
+      const option = document.createElement('option');
+      option.value = device.deviceId;
+      option.textContent = device.label || `Microfone ${index + 1}`;
+      microphoneSelect.appendChild(option);
+    });
+    if (selectedMicrophoneId && devices.some((device) => device.deviceId === selectedMicrophoneId)) {
+      microphoneSelect.value = selectedMicrophoneId;
+    } else if (devices[0]) {
+      selectedMicrophoneId = devices[0].deviceId;
+      microphoneSelect.value = selectedMicrophoneId;
+    }
+  }
+
+  async function changeMicrophone() {
+    if (!localStream || !microphoneSelect.value) return;
+    try {
+      const nextStream = await navigator.mediaDevices.getUserMedia({
+        audio: { deviceId: { exact: microphoneSelect.value }, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: false,
+      });
+      const nextTrack = nextStream.getAudioTracks()[0];
+      const currentTrack = localStream.getAudioTracks()[0];
+      const sender = pc?.getSenders().find((item) => item.track === currentTrack);
+      if (sender) await sender.replaceTrack(nextTrack);
+      localStream.removeTrack(currentTrack);
+      currentTrack?.stop();
+      localStream.addTrack(nextTrack);
+      selectedMicrophoneId = microphoneSelect.value;
+      showToast('Microfone alterado.', 'info', 2500);
+    } catch (err) {
+      showToast('Nao foi possivel trocar o microfone.', 'error');
+      console.error(err);
+      await refreshMicrophones();
+    }
   }
 
   async function enableCamera() {
@@ -617,6 +687,24 @@
   });
 
   btnCamera.addEventListener('click', enableCamera);
+  microphoneSelect.addEventListener('change', changeMicrophone);
+  navigator.mediaDevices.addEventListener('devicechange', refreshMicrophones);
+
+  remoteAudio.volume = 1;
+  remoteVolume.addEventListener('input', () => {
+    ensureRemoteVolumeGain();
+    const volume = Number(remoteVolume.value) / 100;
+    remoteAudio.volume = 1;
+    remoteVideo.volume = 1;
+    if (remoteVolumeGain) {
+      remoteVolumeGain.gain.value = volume;
+      remoteVolumeContext.resume().catch(() => {});
+    } else {
+      remoteAudio.volume = Math.min(volume, 1);
+    }
+    remoteVolumeValue.value = `${remoteVolume.value}%`;
+    remoteVolumeValue.textContent = `${remoteVolume.value}%`;
+  });
 
   function toggleVideoSize(tile, event) {
     if (event.target.closest('button')) return;
@@ -646,6 +734,7 @@
     remoteContextMenu.style.left = `${event.offsetX}px`;
     remoteContextMenu.style.top = `${event.offsetY}px`;
   });
+  remoteContextMenu.addEventListener('click', (event) => event.stopPropagation());
 
   btnRemoteMute.addEventListener('click', (event) => {
     event.stopPropagation();
@@ -917,6 +1006,8 @@
     createRoomButton.hidden = true;
     roomInput.focus();
   });
+
+  backToLobbyButton.addEventListener('click', resetLobbyMode);
 
   copyRoomButton.addEventListener('click', copyRoomCode);
   copyActiveRoomButton.addEventListener('click', async () => {
