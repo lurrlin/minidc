@@ -249,6 +249,16 @@ input:focus-visible {
   font-size: 13px;
   color: var(--text-dim);
 }
+.header-icon-button {
+  margin-left: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 9px;
+  background: var(--surface);
+  color: var(--text-dim);
+  font-size: 16px;
+}
+.header-icon-button:hover { border-color: var(--accent); color: var(--accent-soft); }
 
 .active-room-code { display: flex; align-items: center; gap: 7px; margin-left: auto; margin-right: 16px; }
 .active-room-code code { color: var(--accent-soft); font-size: 12px; }
@@ -297,17 +307,6 @@ input:focus-visible {
   place-items: center;
   border-radius: 50%;
   background: var(--accent);
-.context-volume {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding: 8px 10px 6px;
-  color: var(--text-dim);
-  font-size: 11px;
-}
-.context-volume span { display: flex; justify-content: space-between; gap: 10px; }
-.context-volume output { color: var(--accent-soft); }
-.context-volume input { width: 150px; accent-color: var(--accent); }
   color: var(--accent-ink);
   font: 700 32px var(--font-display);
   z-index: 1;
@@ -362,38 +361,6 @@ input:focus-visible {
   background: #000;
 }
 
-/* Assinatura visual: contorno acende quando a pessoa esta falando */
-.video-tile.is-speaking {
-  border-color: var(--live);
-  box-shadow: 0 0 0 3px var(--live-glow);
-}
-
-.video-tile-remote {
-  flex: 1;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.video-tile-local {
-  position: absolute;
-  right: 22px;
-  bottom: 22px;
-  width: 220px;
-  height: 140px;
-  z-index: 2;
-}
-
-.video-tile-remote.video-square { flex: none; width: 200px; height: 200px; }
-.video-tile-remote.video-expanded { flex: 1; width: 100%; height: 100%; }
-.video-tile-local.video-square { width: 200px; height: 200px; }
-.video-tile-local.video-expanded {
-  position: absolute;
-  inset: 0 22px 130px;
-  width: auto;
-  height: auto;
-  z-index: 3;
-}
-
 .tile-label {
   position: absolute;
   left: 12px;
@@ -405,6 +372,56 @@ input:focus-visible {
   background: rgba(22, 19, 29, 0.72);
   color: var(--text);
   backdrop-filter: blur(4px);
+}
+
+.context-volume {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px 6px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.context-volume span { display: flex; justify-content: space-between; gap: 10px; }
+.context-volume output { color: var(--accent-soft); }
+.context-volume input { width: 150px; accent-color: var(--accent); }
+
+.settings-card { width: 420px; max-width: 90vw; max-height: 80vh; gap: 16px; overflow: hidden; }
+.settings-field { display: flex; flex-direction: column; gap: 7px; color: var(--text-dim); font-size: 13px; }
+.settings-field span { display: flex; justify-content: space-between; gap: 10px; }
+.settings-field output { color: var(--accent-soft); }
+.settings-field select {
+  width: 100%;
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+}
+.settings-field select:focus { border-color: var(--accent); outline: none; }
+.settings-field input { width: 100%; accent-color: var(--accent); }
+.settings-divider { height: 1px; background: var(--border); margin: 2px 0; }
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.settings-toggle input { width: 16px; height: 16px; accent-color: var(--accent); }
+
+input[type="range"] { height: 18px; appearance: none; background: transparent; }
+input[type="range"]::-webkit-slider-runnable-track { height: 5px; border-radius: 5px; background: var(--border); }
+input[type="range"]::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  appearance: none;
+  border: 2px solid var(--accent-soft);
+  border-radius: 50%;
+  background: var(--accent);
 }
 
 .tile-empty-state {
@@ -517,6 +534,7 @@ input:focus-visible {
   padding: 20px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .modal-header {
@@ -546,8 +564,15 @@ input:focus-visible {
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
   overflow-y: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
   padding-right: 4px;
 }
+
+.source-grid::-webkit-scrollbar { width: 8px; }
+.source-grid::-webkit-scrollbar-track { background: var(--surface); border-radius: 8px; }
+.source-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+.source-grid::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
 .screen-audio-option {
   display: flex;

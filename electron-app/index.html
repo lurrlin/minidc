@@ -74,6 +74,7 @@
         <code id="active-room-code"></code>
         <button id="copy-active-room" type="button" aria-label="Copiar código da sala">Copiar</button>
       </div>
+      <button id="open-settings" class="header-icon-button" type="button" aria-label="Abrir configurações">⚙</button>
       <span id="call-status" class="call-status">conectando...</span>
     </header>
 
@@ -106,10 +107,6 @@
     </section>
 
     <footer class="controls-dock">
-      <label class="mic-picker" for="microphone-select">
-        <span>Microfone</span>
-        <select id="microphone-select"></select>
-      </label>
       <button id="btn-mute" class="dock-btn" type="button" aria-pressed="false" aria-label="Mutar microfone">
         <svg class="icon icon-mic-on" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Z" stroke="currentColor" stroke-width="1.8"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         <svg class="icon icon-mic-off" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V9m0-3a3 3 0 0 0-6 0v6c0 .4.06.78.17 1.14M19 11a7 7 0 0 1-1.68 4.56M12 18v3M3 3l18 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -148,6 +145,44 @@
       <div id="source-grid" class="source-grid"></div>
       <button id="stop-screen-share" class="stop-share-button" type="button" hidden>Parar compartilhamento</button>
     </div>
+  </div>
+
+  <div id="settings-modal" class="modal-overlay" hidden>
+    <section class="modal-card settings-card" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="modal-header">
+        <h2 id="settings-title">Configurações</h2>
+        <button id="settings-close" class="modal-close" type="button" aria-label="Fechar">×</button>
+      </div>
+      <label class="settings-field" for="settings-microphone">
+        <span>Microfone</span>
+        <select id="settings-microphone"></select>
+      </label>
+      <label class="settings-field" for="settings-output">
+        <span>Saída de áudio</span>
+        <select id="settings-output"></select>
+      </label>
+      <label class="settings-field" for="settings-input-volume">
+        <span>Volume de entrada <output id="settings-input-value">100%</output></span>
+        <input id="settings-input-volume" type="range" min="0" max="200" value="100" step="1" />
+      </label>
+      <label class="settings-field" for="settings-output-volume">
+        <span>Volume de saída <output id="settings-output-value">100%</output></span>
+        <input id="settings-output-volume" type="range" min="0" max="200" value="100" step="1" />
+      </label>
+      <div class="settings-divider"></div>
+      <label class="settings-toggle">
+        <input id="settings-noise-suppression" type="checkbox" checked />
+        <span>Redução de ruído</span>
+      </label>
+      <label class="settings-toggle">
+        <input id="settings-echo-cancellation" type="checkbox" checked />
+        <span>Cancelamento de eco</span>
+      </label>
+      <label class="settings-toggle">
+        <input id="settings-auto-gain" type="checkbox" checked />
+        <span>Ganho automático</span>
+      </label>
+    </section>
   </div>
 
   <!-- Toast de erro/aviso -->

@@ -56,9 +56,20 @@
   const btnCamera = document.getElementById('btn-camera');
   const btnShare = document.getElementById('btn-share');
   const btnLeave = document.getElementById('btn-leave');
-  const microphoneSelect = document.getElementById('microphone-select');
   const remoteVolume = document.getElementById('remote-volume');
   const remoteVolumeValue = document.getElementById('remote-volume-value');
+  const settingsModal = document.getElementById('settings-modal');
+  const openSettingsButton = document.getElementById('open-settings');
+  const settingsCloseButton = document.getElementById('settings-close');
+  const settingsMicrophone = document.getElementById('settings-microphone');
+  const settingsOutput = document.getElementById('settings-output');
+  const settingsInputVolume = document.getElementById('settings-input-volume');
+  const settingsOutputVolume = document.getElementById('settings-output-volume');
+  const settingsInputValue = document.getElementById('settings-input-value');
+  const settingsOutputValue = document.getElementById('settings-output-value');
+  const settingsNoiseSuppression = document.getElementById('settings-noise-suppression');
+  const settingsEchoCancellation = document.getElementById('settings-echo-cancellation');
+  const settingsAutoGain = document.getElementById('settings-auto-gain');
 
   const sourceModal = document.getElementById('source-modal');
   const sourceModalClose = document.getElementById('source-modal-close');
@@ -102,6 +113,19 @@
   let reconnectTimer = null;
   let roomCheckResolver = null;
   let selectedMicrophoneId = '';
+  let microphoneSender = null;
+  let microphoneGainContext = null;
+  let microphoneGainNode = null;
+  let microphoneGainDestination = null;
+
+  function getMicrophoneConstraints(deviceId = selectedMicrophoneId) {
+    return {
+      ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+      echoCancellation: settingsEchoCancellation.checked,
+      noiseSuppression: settingsNoiseSuppression.checked,
+      autoGainControl: settingsAutoGain.checked,
+    };
+  }
 
   // ---------------------------------------------------------------------
   // Utilitarios de UI
@@ -220,15 +244,11 @@
   }
 
   async function startLocalMedia() {
-    const audioConstraints = {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-    };
+    const audioConstraints = getMicrophoneConstraints();
 
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
-        audio: selectedMicrophoneId ? { ...audioConstraints, deviceId: { exact: selectedMicrophoneId } } : audioConstraints,
+        audio: audioConstraints,
         video: false,
       });
     } catch (videoError) {
@@ -236,7 +256,7 @@
       // Mantemos o audio para a chamada continuar mesmo sem video local.
       console.warn('Camera indisponivel; tentando iniciar somente o audio:', videoError);
       try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints, video: false });
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: getMicrophoneConstraints(''), video: false });
         showToast('Camera ocupada. A chamada continuara somente com audio nesta janela.', 'info', 7000);
       } catch (audioError) {
         console.error('Nao foi possivel acessar camera/microfone:', audioError);
@@ -253,42 +273,109 @@
   async function refreshMicrophones() {
     const devices = (await navigator.mediaDevices.enumerateDevices())
       .filter((device) => device.kind === 'audioinput');
-    microphoneSelect.innerHTML = '';
+    settingsMicrophone.innerHTML = '';
     devices.forEach((device, index) => {
       const option = document.createElement('option');
       option.value = device.deviceId;
       option.textContent = device.label || `Microfone ${index + 1}`;
-      microphoneSelect.appendChild(option);
+      settingsMicrophone.appendChild(option);
     });
     if (selectedMicrophoneId && devices.some((device) => device.deviceId === selectedMicrophoneId)) {
-      microphoneSelect.value = selectedMicrophoneId;
+      settingsMicrophone.value = selectedMicrophoneId;
     } else if (devices[0]) {
       selectedMicrophoneId = devices[0].deviceId;
-      microphoneSelect.value = selectedMicrophoneId;
+      settingsMicrophone.value = selectedMicrophoneId;
     }
   }
 
   async function changeMicrophone() {
-    if (!localStream || !microphoneSelect.value) return;
+    if (!localStream || !settingsMicrophone.value) return;
     try {
+      await stopMicrophoneVolume();
       const nextStream = await navigator.mediaDevices.getUserMedia({
-        audio: { deviceId: { exact: microphoneSelect.value }, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        audio: getMicrophoneConstraints(settingsMicrophone.value),
         video: false,
       });
       const nextTrack = nextStream.getAudioTracks()[0];
       const currentTrack = localStream.getAudioTracks()[0];
-      const sender = pc?.getSenders().find((item) => item.track === currentTrack);
-      if (sender) await sender.replaceTrack(nextTrack);
+      if (microphoneSender) await microphoneSender.replaceTrack(nextTrack);
       localStream.removeTrack(currentTrack);
       currentTrack?.stop();
       localStream.addTrack(nextTrack);
-      selectedMicrophoneId = microphoneSelect.value;
+      selectedMicrophoneId = settingsMicrophone.value;
       showToast('Microfone alterado.', 'info', 2500);
     } catch (err) {
       showToast('Nao foi possivel trocar o microfone.', 'error');
       console.error(err);
       await refreshMicrophones();
     }
+  }
+
+  async function applyAudioProcessingSettings() {
+    const microphoneTrack = localStream?.getAudioTracks()[0];
+    if (!microphoneTrack) return;
+    try {
+      await microphoneTrack.applyConstraints(getMicrophoneConstraints(selectedMicrophoneId));
+      showToast('Tratamento de audio atualizado.', 'info', 2500);
+    } catch (err) {
+      showToast('Nao foi possivel aplicar esse tratamento de audio.', 'error');
+      console.error('Erro aplicando tratamento de audio:', err);
+    }
+  }
+
+  async function stopMicrophoneVolume() {
+    if (microphoneSender) {
+      const sourceTrack = localStream?.getAudioTracks()[0];
+      if (sourceTrack) await microphoneSender.replaceTrack(sourceTrack);
+    }
+    microphoneGainContext?.close();
+    microphoneGainContext = null;
+    microphoneGainNode = null;
+    microphoneGainDestination = null;
+  }
+
+  async function applyMicrophoneVolume() {
+    if (!localStream || !microphoneSender) return;
+    const sourceTrack = localStream.getAudioTracks()[0];
+    if (!sourceTrack) return;
+    if (!microphoneGainNode) {
+      microphoneGainContext = new AudioContext();
+      const source = microphoneGainContext.createMediaStreamSource(new MediaStream([sourceTrack]));
+      microphoneGainNode = microphoneGainContext.createGain();
+      microphoneGainDestination = microphoneGainContext.createMediaStreamDestination();
+      source.connect(microphoneGainNode);
+      microphoneGainNode.connect(microphoneGainDestination);
+      await microphoneSender.replaceTrack(microphoneGainDestination.stream.getAudioTracks()[0]);
+    }
+    microphoneGainNode.gain.value = Number(settingsInputVolume.value) / 100;
+    await microphoneGainContext.resume();
+  }
+
+  async function refreshAudioOutputs() {
+    const devices = (await navigator.mediaDevices.enumerateDevices())
+      .filter((device) => device.kind === 'audiooutput');
+    settingsOutput.innerHTML = '';
+    devices.forEach((device, index) => {
+      const option = document.createElement('option');
+      option.value = device.deviceId;
+      option.textContent = device.label || `Saida de audio ${index + 1}`;
+      settingsOutput.appendChild(option);
+    });
+  }
+
+  async function changeAudioOutput() {
+    if (!settingsOutput.value || typeof remoteAudio.setSinkId !== 'function') return;
+    try {
+      await remoteAudio.setSinkId(settingsOutput.value);
+    } catch (err) {
+      showToast('Nao foi possivel trocar a saida de audio.', 'error');
+      console.error(err);
+    }
+  }
+
+  async function openSettings() {
+    await Promise.all([refreshMicrophones(), refreshAudioOutputs()]);
+    settingsModal.hidden = false;
   }
 
   async function enableCamera() {
@@ -596,7 +683,10 @@
 
     // Reanexa as tracks locais atuais (camera ligada/desligada, tela
     // compartilhada ou nao) a nova conexao.
-    localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+    localStream.getTracks().forEach((track) => {
+      const sender = pc.addTrack(track, localStream);
+      if (track.kind === 'audio') microphoneSender = sender;
+    });
     videoTransceiver = pc.getTransceivers().find((transceiver) => transceiver.sender.track?.kind === 'video');
     if (!videoTransceiver) videoTransceiver = pc.addTransceiver('video', { direction: 'sendrecv' });
     screenAudioTransceiver = pc.addTransceiver('audio', { direction: 'sendrecv' });
@@ -687,7 +777,20 @@
   });
 
   btnCamera.addEventListener('click', enableCamera);
-  microphoneSelect.addEventListener('change', changeMicrophone);
+  openSettingsButton.addEventListener('click', openSettings);
+  settingsCloseButton.addEventListener('click', () => { settingsModal.hidden = true; });
+  settingsModal.addEventListener('click', (event) => {
+    if (event.target === settingsModal) settingsModal.hidden = true;
+  });
+  settingsMicrophone.addEventListener('change', changeMicrophone);
+  settingsOutput.addEventListener('change', changeAudioOutput);
+  [settingsNoiseSuppression, settingsEchoCancellation, settingsAutoGain]
+    .forEach((setting) => setting.addEventListener('change', applyAudioProcessingSettings));
+  settingsInputVolume.addEventListener('input', () => {
+    settingsInputValue.value = `${settingsInputVolume.value}%`;
+    settingsInputValue.textContent = `${settingsInputVolume.value}%`;
+    applyMicrophoneVolume().catch((err) => console.error('Erro ajustando volume do microfone:', err));
+  });
   navigator.mediaDevices.addEventListener('devicechange', refreshMicrophones);
 
   remoteAudio.volume = 1;
@@ -704,6 +807,14 @@
     }
     remoteVolumeValue.value = `${remoteVolume.value}%`;
     remoteVolumeValue.textContent = `${remoteVolume.value}%`;
+    settingsOutputVolume.value = remoteVolume.value;
+    settingsOutputValue.value = `${remoteVolume.value}%`;
+    settingsOutputValue.textContent = `${remoteVolume.value}%`;
+  });
+
+  settingsOutputVolume.addEventListener('input', () => {
+    remoteVolume.value = settingsOutputVolume.value;
+    remoteVolume.dispatchEvent(new Event('input'));
   });
 
   function toggleVideoSize(tile, event) {
@@ -915,6 +1026,7 @@
     if (screenStream) screenStream.getTracks().forEach((t) => t.stop());
     if (localStream) localStream.getTracks().forEach((t) => t.stop());
     stopNativeAudioCapture().catch(() => {});
+    stopMicrophoneVolume().catch(() => {});
     if (pc) pc.close();
 
     pc = null;
@@ -934,6 +1046,7 @@
     clearTimeout(iceFailureTimer);
     renegotiationQueued = false;
     renegotiationInProgress = false;
+    microphoneSender = null;
     remoteVideo.srcObject = null;
     remoteVideo.dataset.empty = 'true';
     localVideo.srcObject = null;
