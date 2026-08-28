@@ -1,7 +1,7 @@
 {
-  "name": "mini-discord",
-  "productName": "Mini Discord",
-  "version": "1.1.2",
+  "name": "unme",
+  "productName": "unme",
+  "version": "1.3.2",
   "description": "App desktop P2P de audio/video (2 usuarios) com WebRTC + Electron",
   "main": "main.js",
   "private": true,
@@ -20,8 +20,8 @@
     "electron-builder": "^24.13.3"
   },
   "build": {
-    "appId": "com.pessoal.minidiscord",
-    "productName": "Mini Discord",
+    "appId": "com.pessoal.unme",
+    "productName": "unme",
     "files": [
       "**/*",
       "!**/{.gitignore,.env,.env.example}"

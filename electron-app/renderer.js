@@ -34,10 +34,14 @@
   const callStatus = document.getElementById('call-status');
 
   const remoteVideo = document.getElementById('remote-video');
+  const remoteAudio = document.getElementById('remote-audio');
   const remoteTile = document.getElementById('remote-tile');
   const localVideo = document.getElementById('local-video');
   const localTile = document.getElementById('local-tile');
   const localTileLabel = document.getElementById('local-tile-label');
+  const btnFullscreen = document.getElementById('btn-fullscreen');
+  const btnRemoteMute = document.getElementById('btn-remote-mute');
+  const remoteContextMenu = document.getElementById('remote-context-menu');
 
   const btnMute = document.getElementById('btn-mute');
   const btnCamera = document.getElementById('btn-camera');
@@ -47,6 +51,8 @@
   const sourceModal = document.getElementById('source-modal');
   const sourceModalClose = document.getElementById('source-modal-close');
   const sourceGrid = document.getElementById('source-grid');
+  const includeSystemAudio = document.getElementById('include-system-audio');
+  const stopScreenShareButton = document.getElementById('stop-screen-share');
 
   const toastEl = document.getElementById('toast');
 
@@ -56,6 +62,8 @@
   let localStream = null;
   let cameraTrack = null; // guardamos a track da webcam separada pra poder voltar dela apos o compartilhamento de tela
   let screenStream = null;
+  let screenAudioTrack = null;
+  let screenAudioTransceiver = null;
   let pc = null;
   let currentRoom = null;
   let isInitiator = false;
@@ -69,6 +77,8 @@
   let videoTransceiver = null;
   let offerRetryTimer = null;
   let iceFailureTimer = null;
+  let renegotiationQueued = false;
+  let renegotiationInProgress = false;
   let toastTimer = null;
   let reconnectTimer = null;
 
@@ -150,7 +160,7 @@
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
         audio: audioConstraints,
-        video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: false,
       });
     } catch (videoError) {
       // Duas instancias no mesmo PC podem disputar a mesma camera.
@@ -165,9 +175,34 @@
       }
     }
 
-    cameraTrack = localStream.getVideoTracks()[0];
+    cameraTrack = null;
     localVideo.srcObject = localStream;
     attachSpeakingIndicator(localStream, localTile);
+  }
+
+  async function enableCamera() {
+    if (cameraTrack) {
+      cameraTrack.enabled = !cameraTrack.enabled;
+      btnCamera.setAttribute('aria-pressed', String(!cameraTrack.enabled));
+      return;
+    }
+
+    try {
+      const cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+      cameraTrack = cameraStream.getVideoTracks()[0];
+      localStream.addTrack(cameraTrack);
+      videoTransceiver.sender.replaceTrack(cameraTrack);
+      localVideo.srcObject = localStream;
+      localTile.classList.add('has-video', 'video-square');
+      btnCamera.setAttribute('aria-pressed', 'true');
+      sendSignal({ type: 'renegotiate' });
+      await renegotiateConnection();
+    } catch (err) {
+      showToast('Nao foi possivel ligar a camera.', 'error');
+      console.error(err);
+    }
   }
 
   // ---------------------------------------------------------------------
@@ -182,7 +217,12 @@
   }
 
   async function renegotiateConnection() {
-    if (!pc || !isInitiator || pc.signalingState !== 'stable') return;
+    if (!pc || !isInitiator) return;
+    if (renegotiationInProgress || pc.signalingState !== 'stable') {
+      renegotiationQueued = true;
+      return;
+    }
+    renegotiationInProgress = true;
     try {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
@@ -190,6 +230,12 @@
     } catch (err) {
       console.error('Erro renegociando midia:', err);
       showToast(`Falha ao atualizar a midia: ${err.message || err}`, 'error', 9000);
+    } finally {
+      renegotiationInProgress = false;
+      if (renegotiationQueued && pc?.signalingState === 'stable') {
+        renegotiationQueued = false;
+        await renegotiateConnection();
+      }
     }
   }
 
@@ -375,6 +421,7 @@
     localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
     videoTransceiver = pc.getTransceivers().find((transceiver) => transceiver.sender.track?.kind === 'video');
     if (!videoTransceiver) videoTransceiver = pc.addTransceiver('video', { direction: 'sendrecv' });
+    screenAudioTransceiver = pc.addTransceiver('audio', { direction: 'sendrecv' });
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
@@ -383,10 +430,17 @@
     };
 
     pc.ontrack = (event) => {
-      const stream = event.streams[0] || new MediaStream([event.track]);
-      remoteVideo.srcObject = stream;
-      remoteVideo.dataset.empty = 'false';
-      attachSpeakingIndicator(stream, remoteTile);
+      if (event.track.kind === 'video') {
+        remoteVideo.srcObject = new MediaStream([event.track]);
+        remoteVideo.dataset.empty = 'false';
+        remoteTile.classList.add('has-video', 'video-square');
+        remoteVideo.play().catch(() => {});
+      } else if (event.track.kind === 'audio') {
+        const audioTracks = remoteAudio.srcObject?.getAudioTracks() || [];
+        remoteAudio.srcObject = new MediaStream([...audioTracks, event.track]);
+        remoteAudio.play().catch(() => {});
+        attachSpeakingIndicator(remoteAudio.srcObject, remoteTile);
+      }
     };
 
     pc.onconnectionstatechange = () => {
@@ -453,18 +507,54 @@
     btnMute.setAttribute('aria-pressed', String(!track.enabled));
   });
 
-  btnCamera.addEventListener('click', () => {
-    if (!cameraTrack) return;
-    cameraTrack.enabled = !cameraTrack.enabled;
-    btnCamera.setAttribute('aria-pressed', String(!cameraTrack.enabled));
+  btnCamera.addEventListener('click', enableCamera);
+
+  function toggleVideoSize(tile, event) {
+    if (event.target.closest('button')) return;
+    tile.classList.toggle('video-expanded');
+    tile.classList.toggle('video-square');
+  }
+
+  remoteTile.addEventListener('click', (event) => toggleVideoSize(remoteTile, event));
+  localTile.addEventListener('click', (event) => toggleVideoSize(localTile, event));
+
+  btnFullscreen.addEventListener('click', async (event) => {
+    event.stopPropagation();
+    try {
+      await remoteTile.requestFullscreen();
+    } catch (err) {
+      showToast('Nao foi possivel abrir tela cheia.', 'error');
+    }
   });
 
+  function closeRemoteContextMenu() {
+    remoteContextMenu.hidden = true;
+  }
+
+  remoteTile.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    remoteContextMenu.hidden = false;
+    remoteContextMenu.style.left = `${event.offsetX}px`;
+    remoteContextMenu.style.top = `${event.offsetY}px`;
+  });
+
+  btnRemoteMute.addEventListener('click', (event) => {
+    event.stopPropagation();
+    remoteVideo.muted = !remoteVideo.muted;
+    remoteAudio.muted = remoteVideo.muted;
+    btnRemoteMute.textContent = remoteVideo.muted ? 'Desmutar live' : 'Mutar live';
+    closeRemoteContextMenu();
+  });
+
+  document.addEventListener('click', closeRemoteContextMenu);
+
   btnShare.addEventListener('click', async () => {
-    if (screenStream) {
-      stopScreenShare();
-    } else {
-      await openSourcePicker();
-    }
+    await openSourcePicker();
+  });
+
+  stopScreenShareButton.addEventListener('click', async () => {
+    closeSourcePicker();
+    await stopScreenShare();
   });
 
   btnLeave.addEventListener('click', () => leaveCall());
@@ -480,6 +570,8 @@
     }
 
     sourceGrid.innerHTML = '';
+    includeSystemAudio.checked = Boolean(screenAudioTrack);
+    stopScreenShareButton.hidden = !screenStream;
     sources.forEach((source) => {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -490,7 +582,7 @@
       `;
       btn.addEventListener('click', () => {
         closeSourcePicker();
-        startScreenShare(source.id);
+        startScreenShare(source.id, includeSystemAudio.checked);
       });
       sourceGrid.appendChild(btn);
     });
@@ -511,10 +603,16 @@
     if (e.key === 'Escape' && !sourceModal.hidden) closeSourcePicker();
   });
 
-  async function startScreenShare(sourceId) {
+  async function startScreenShare(sourceId, includeAudio = false) {
+    const previousScreenStream = screenStream;
     try {
-      screenStream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
+      const nextScreenStream = await navigator.mediaDevices.getUserMedia({
+        audio: includeAudio ? {
+          mandatory: {
+            chromeMediaSource: 'desktop',
+            chromeMediaSourceId: sourceId,
+          },
+        } : false,
         video: {
           mandatory: {
             chromeMediaSource: 'desktop',
@@ -525,6 +623,7 @@
           },
         },
       });
+      screenStream = nextScreenStream;
     } catch (err) {
       showToast('Nao foi possivel iniciar o compartilhamento de tela.', 'error');
       console.error(err);
@@ -532,26 +631,40 @@
     }
 
     const screenTrack = screenStream.getVideoTracks()[0];
+    screenAudioTrack = screenStream.getAudioTracks()[0] || null;
 
     // O coracao da troca: substitui a track de video no sender existente,
     // sem precisar renegociar a offer/answer.
     const sender = pc && (videoTransceiver?.sender || pc.getSenders().find((s) => s.track?.kind === 'video'));
     if (sender) await sender.replaceTrack(screenTrack);
+    if (screenAudioTrack && screenAudioTransceiver) {
+      await screenAudioTransceiver.sender.replaceTrack(screenAudioTrack);
+    } else if (screenAudioTransceiver) {
+      await screenAudioTransceiver.sender.replaceTrack(null);
+    }
+
+    if (previousScreenStream && previousScreenStream !== screenStream) {
+      previousScreenStream.getTracks().forEach((track) => track.stop());
+    }
 
     // Preview local passa a mostrar a tela compartilhada.
     localVideo.srcObject = screenStream;
     localTile.classList.add('screen-share');
+    localTile.classList.add('has-video', 'video-square');
     localTileLabel.textContent = 'sua tela';
     sendSignal({ type: 'screen-share-start' });
 
     btnShare.setAttribute('aria-pressed', 'true');
+    stopScreenShareButton.hidden = false;
     sendSignal({ type: 'renegotiate' });
     await renegotiateConnection();
 
     // Se o usuario parar o compartilhamento pelo controle nativo do SO
     // (ex: barra "Parar de compartilhar" do Windows/macOS), voltamos pra
     // camera automaticamente.
-    screenTrack.addEventListener('ended', () => stopScreenShare());
+    screenTrack.addEventListener('ended', () => {
+      if (screenStream === nextScreenStream) stopScreenShare();
+    });
   }
 
   async function stopScreenShare() {
@@ -559,12 +672,16 @@
 
     screenStream.getTracks().forEach((t) => t.stop());
     screenStream = null;
+    stopScreenShareButton.hidden = true;
+    if (screenAudioTransceiver) await screenAudioTransceiver.sender.replaceTrack(null);
+    screenAudioTrack = null;
 
     const sender = pc && (videoTransceiver?.sender || pc.getSenders().find((s) => s.track?.kind === 'video'));
     if (sender && cameraTrack) await sender.replaceTrack(cameraTrack);
 
     localVideo.srcObject = localStream;
     localTile.classList.remove('screen-share');
+    localTile.classList.toggle('has-video', Boolean(cameraTrack));
     localTileLabel.textContent = 'voce';
     btnShare.setAttribute('aria-pressed', 'false');
     sendSignal({ type: 'screen-share-stop' });
@@ -595,6 +712,8 @@
     videoTransceiver = null;
     clearTimeout(offerRetryTimer);
     clearTimeout(iceFailureTimer);
+    renegotiationQueued = false;
+    renegotiationInProgress = false;
     remoteVideo.srcObject = null;
     remoteVideo.dataset.empty = 'true';
     localVideo.srcObject = null;

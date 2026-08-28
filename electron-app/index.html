@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self' data: blob:; connect-src * ws: wss:; media-src 'self' blob:; font-src 'self' https://fonts.gstatic.com; style-src 'self' https://fonts.googleapis.com;" />
-  <title>Mini Discord</title>
+  <title>Unme</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -19,8 +19,8 @@
         <span class="dot dot-a"></span>
         <span class="dot dot-b"></span>
       </div>
-      <h1 class="lobby-title">Mini Discord</h1>
-      <p class="lobby-subtitle">so voces dois. digite o nome da sala e entre.</p>
+      <h1 class="lobby-title">Unme</h1>
+      <p class="lobby-subtitle">Apenas dois. Entre na sua sala privada.</p>
 
       <form id="join-form" class="lobby-form">
         <label for="room-input" class="sr-only">Nome da sala</label>
@@ -54,15 +54,24 @@
     </header>
 
     <section class="stage">
-      <div class="video-tile video-tile-remote" id="remote-tile">
+      <div class="video-tile video-tile-remote video-square" id="remote-tile">
+        <div class="avatar" id="remote-avatar" aria-label="Avatar da outra pessoa">E</div>
         <video id="remote-video" autoplay playsinline data-empty="true"></video>
+        <audio id="remote-audio" autoplay></audio>
         <div class="tile-empty-state" id="remote-empty">
           <span>esperando a outra pessoa entrar...</span>
         </div>
         <span class="tile-label">ela</span>
+        <div class="video-actions">
+          <button id="btn-fullscreen" type="button">Tela cheia</button>
+        </div>
+        <div id="remote-context-menu" class="context-menu" hidden>
+          <button id="btn-remote-mute" type="button">Mutar live</button>
+        </div>
       </div>
 
-      <div class="video-tile video-tile-local" id="local-tile">
+      <div class="video-tile video-tile-local video-square" id="local-tile">
+        <div class="avatar" id="local-avatar" aria-label="Seu avatar">V</div>
         <video id="local-video" autoplay playsinline muted></video>
         <span class="tile-label" id="local-tile-label">voce</span>
       </div>
@@ -100,7 +109,12 @@
         <h2>Compartilhar tela</h2>
         <button id="source-modal-close" class="modal-close" type="button" aria-label="Fechar">×</button>
       </div>
+      <label class="screen-audio-option">
+        <input id="include-system-audio" type="checkbox" />
+        <span>Incluir áudio do computador</span>
+      </label>
       <div id="source-grid" class="source-grid"></div>
+      <button id="stop-screen-share" class="stop-share-button" type="button" hidden>Parar compartilhamento</button>
     </div>
   </div>
 

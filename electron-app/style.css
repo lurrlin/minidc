@@ -1,5 +1,5 @@
 /* =========================================================================
-   Mini Discord - Design tokens
+  unme - Design tokens
    Paleta: charcoal-ameixa quente (nao preto puro) + accent ambar.
    O "sinal" visual do app: o contorno de cada video-tile acende suavemente
    (cinza -> verde-sálvia) quando aquela pessoa esta falando, com base em
@@ -8,25 +8,25 @@
    ========================================================================= */
 
 :root {
-  --bg: #16131d;
-  --surface: #1e1a28;
-  --surface-2: #262032;
-  --border: #322b40;
-  --border-soft: #241f2e;
+  --bg: #08090d;
+  --surface: #101219;
+  --surface-2: #181c25;
+  --border: #29313d;
+  --border-soft: #1a202a;
 
   --text: #f3efe7;
   --text-dim: #a79fb5;
   --text-faint: #6f6880;
 
-  --accent: #e8a33d;
-  --accent-soft: #f0c274;
-  --accent-ink: #241705;
+  --accent: #62e6c6;
+  --accent-soft: #a0f4df;
+  --accent-ink: #061713;
 
   --live: #7fb88f;
   --live-glow: rgba(127, 184, 143, 0.45);
 
-  --danger: #e2596b;
-  --danger-soft: #f2828f;
+  --danger: #ff5d73;
+  --danger-soft: #ff9aaa;
 
   --radius-lg: 20px;
   --radius-md: 14px;
@@ -252,6 +252,64 @@ input:focus-visible {
   transform: scaleX(-1); /* espelha a webcam, como qualquer app de video-chamada */
 }
 
+.avatar {
+  width: 88px;
+  height: 88px;
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font: 700 32px var(--font-display);
+  z-index: 1;
+}
+
+.video-tile video[data-empty="true"] { display: none; }
+.video-tile:not(.has-video) video { display: none; }
+.video-tile.has-video .avatar { display: none; }
+.video-square { width: 200px; height: 200px; flex: none; cursor: pointer; }
+.video-expanded { width: 100%; height: 100%; flex: 1; cursor: pointer; }
+.video-actions {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: 4;
+  display: flex;
+  gap: 6px;
+}
+.video-actions button {
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  background: rgba(22, 19, 29, .8);
+  color: var(--text);
+}
+.video-actions button:hover { background: var(--accent); color: var(--accent-ink); }
+
+.context-menu {
+  position: absolute;
+  z-index: 8;
+  min-width: 140px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .35);
+}
+.context-menu button {
+  width: 100%;
+  border: 0;
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+.context-menu button:hover { background: var(--accent); color: var(--accent-ink); }
+
 .video-tile.screen-share video {
   object-fit: contain;
   transform: none;
@@ -277,6 +335,17 @@ input:focus-visible {
   width: 220px;
   height: 140px;
   z-index: 2;
+}
+
+.video-tile-remote.video-square { flex: none; width: 200px; height: 200px; }
+.video-tile-remote.video-expanded { flex: 1; width: 100%; height: 100%; }
+.video-tile-local.video-square { width: 200px; height: 200px; }
+.video-tile-local.video-expanded {
+  position: absolute;
+  inset: 0 22px 130px;
+  width: auto;
+  height: auto;
+  z-index: 3;
 }
 
 .tile-label {
@@ -414,6 +483,25 @@ input:focus-visible {
   overflow-y: auto;
   padding-right: 4px;
 }
+
+.screen-audio-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.screen-audio-option input { accent-color: var(--accent); }
+.stop-share-button {
+  margin-top: 14px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  background: transparent;
+  color: var(--danger-soft);
+}
+.stop-share-button:hover { background: var(--danger); color: #fff; }
 
 .source-option {
   border: 1px solid var(--border);
