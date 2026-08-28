@@ -13,9 +13,11 @@
     "dist:mac": "electron-builder --mac"
   },
   "dependencies": {
+    "electron-native-screenshare": "^1.2.0",
     "socket.io-client": "^4.7.5"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.2.0",
     "electron": "^31.3.1",
     "electron-builder": "^24.13.3"
   },
@@ -31,7 +33,9 @@
     },
     "mac": {
       "category": "public.app-category.social-networking",
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "extendInfo": {
         "NSCameraUsageDescription": "O Mini Discord precisa da camera para a chamada de video.",
         "NSMicrophoneUsageDescription": "O Mini Discord precisa do microfone para a chamada de audio.",
@@ -39,7 +43,9 @@
       }
     },
     "win": {
-      "target": ["nsis"]
+      "target": [
+        "nsis"
+      ]
     },
     "nsis": {
       "oneClick": false,
