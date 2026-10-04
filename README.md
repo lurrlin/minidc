@@ -27,8 +27,9 @@ Crie uma sala, copie o código e envie para a outra pessoa. Ela usa **Entrar em 
 - **Microfone:** liga ou silencia sua voz.
 - **Câmera:** ativa ou desativa o vídeo, sem precisar reentrar.
 - **Tela:** escolhe uma tela ou janela; permite trocar a fonte ou parar a transmissão. A opção de áudio inclui o som da captura quando disponível.
-- **Áudio da chamada:** slider visível no vídeo remoto, de 0% a 200%. Controla a mistura da voz e do áudio compartilhado. Acima de 100% aplica ganho real; sinais já muito altos podem distorcer.
-- **Clique no vídeo:** destaca aquela tela; os controles de volume não mudam seu tamanho.
+- **Botão direito (M2) na tela da outra pessoa:** abre os controles **Voz da pessoa** e **Áudio da transmissão**, cada um de 0% a 200%. Eles controlam canais separados e só aparecem nesse menu, inclusive em tela cheia. Ajustar um não muda o outro. Acima de 100% aplica ganho real; sinais já muito altos podem distorcer.
+- **Ouvir (deafen):** o botão com fone na barra inferior silencia todo o áudio recebido, sem desligar o microfone. Clique de novo para ouvir com os volumes anteriores. Alterar os sliders enquanto silenciado não libera som. A opção funciona mesmo quando ativada antes de a outra pessoa entrar.
+- **Clique no quadro:** destaca aquela tela; os controles de volume não mudam seu tamanho. Os quadros com avatar e sem compartilhamento usam o mesmo espaço e comportamento dos quadros com vídeo.
 - **Tela cheia:** mantém a imagem sem espelhamento e o volume acessível.
 - **Tela cheia:** o mesmo botão muda para **Sair da tela cheia**; Escape também sai.
 - **Configurações:** escolhe microfone e saída e ajusta ganho de entrada/saída. Redução de ruído, cancelamento de eco e ganho automático reabrem a captura com as opções exigidas, confirmam o resultado no microfone e substituem a voz enviada sem renegociar a chamada. Os estados **Ativo**, **Desligado** e **Indisponível** refletem a captura. Se uma mudança falhar, o microfone anterior permanece ativo. Escape fecha os painéis.
@@ -65,7 +66,7 @@ electron-app/
 
 A conexão negocia três canais `sendrecv`: microfone, vídeo e áudio da tela. O primeiro participante cria os canais; o segundo reutiliza os canais da oferta antes de responder. Isso permite transmitir vídeo depois de entrar sem câmera, nos dois sentidos. A troca câmera/tela usa `replaceTrack`, sem nova sala.
 
-O áudio remoto passa por fontes separadas de Web Audio, uma por track, conectadas a um ganho comum e a uma saída reproduzida pelo elemento de áudio. Assim, voz e som da tela são misturados, o ganho de 200% funciona e a seleção de dispositivo de saída permanece disponível.
+O áudio remoto passa por fontes separadas de Web Audio, uma por track. A associação do transceiver identifica os canais de voz e transmissão, cada um com seu ganho próprio. Eles se somam antes do ganho geral de saída e do elemento de áudio. **Volume geral de saída**, nas configurações, afeta os dois canais. O deafen zera a saída geral e silencia o elemento de áudio, preservando os níveis individuais; reativá-lo restaura a reprodução. O indicador de fala acompanha apenas a voz, mesmo com o áudio recebido silenciado.
 
 Ao sair, a aplicação libera tracks, conexões, contextos de áudio, indicadores de fala e timers. Quem permanece na sala assume a iniciativa da próxima conexão. A tela ativa é reanexada quando a outra pessoa volta.
 
@@ -84,6 +85,8 @@ Os testes do aplicativo usam o Chromium incluído no Electron, vídeo gerado por
 Os testes do servidor usam uma porta local aleatória e conferem limite de participantes, validação, encaminhamento restrito à sala, colisão com identificadores internos, mensagens inválidas, saída/reentrada e limpeza de salas.
 
 Os testes também conferem entrada/saída de tela cheia, persistência de nome/foto, compressão da foto e envio pelo canal de dados P2P. Para cada opção de processamento de voz, ligam e desligam a opção, verificam as configurações efetivas da captura e a preservação de mudo e da saída enviada. Uma falha simulada verifica a manutenção do microfone anterior. Os perfis de teste usam armazenamento temporário isolado dos dados reais do usuário.
+
+As medições de áudio verificam a independência de voz/transmissão, ganho da transmissão, silêncio total com deafen e restauração dos volumes. A interface verifica os quadros vazios ocupando o mesmo espaço dos vídeos, o menu M2 oculto por padrão, o roteamento dos canais e o deafen sem mutar o microfone. As imagens de conferência incluem `audio-only.png` e `call.png`.
 
 Os testes simulados não substituem a conferência entre dois computadores de captura nativa de áudio, eficácia acústica da redução de ruído/eco em microfones físicos, permissões do sistema, seleção física de saída e comportamento de redes/NAT diferentes.
 
