@@ -3,24 +3,30 @@
 <head>
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self' data: blob:; connect-src * ws: wss:; media-src 'self' blob:; font-src 'self' https://fonts.gstatic.com; style-src 'self' https://fonts.googleapis.com;" />
+        content="default-src 'self' data: blob:; connect-src * ws: wss:; media-src 'self' blob:; font-src 'self'; style-src 'self';" />
   <title>Unme</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
   <!-- ===================== TELA 1: LOBBY (entrar na sala) ===================== -->
   <main id="lobby-screen" class="screen">
+    <div class="lobby-brand"><span class="brand-symbol" aria-hidden="true">u.</span> unme <span class="brand-caption">SEU ESPAÇO A DOIS</span></div>
+    <section class="lobby-intro">
+      <span class="eyebrow"><span class="live-dot"></span> Perto, mesmo de longe</span>
+      <h1>Uma conversa.<br>Dois mundos.<br><em>O mesmo lugar.</em></h1>
+      <p>Compartilhe a tela, a voz e aquele momento.<br>Um espaço tranquilo, só para vocês.</p>
+      <div class="connection-art" aria-hidden="true"><span class="art-person">u</span><span class="art-line"></span><span class="art-person art-person-other">me</span></div>
+      <div class="lobby-features"><span>Voz & vídeo</span><span>Tela compartilhada</span><span>Só vocês dois</span></div>
+    </section>
     <section class="lobby-card">
       <div class="lobby-mark" aria-hidden="true">
         <span class="dot dot-a"></span>
         <span class="dot dot-b"></span>
       </div>
-      <h1 class="lobby-title">Unme</h1>
-      <p class="lobby-subtitle">Apenas dois. Entre na sua sala privada.</p>
+      <span class="eyebrow">COMECE POR AQUI</span>
+      <h2 class="lobby-title">Vamos nos encontrar?</h2>
+      <p class="lobby-subtitle">Crie um espaço e envie o código para sua pessoa.</p>
 
       <div class="lobby-actions">
         <button id="create-room-button" class="btn btn-primary" type="button">
@@ -37,7 +43,7 @@
           id="room-input"
           class="room-input"
           type="text"
-          placeholder="nome-da-sala"
+          placeholder="Cole o código da sala"
           autocomplete="off"
           spellcheck="false"
           maxlength="40"
@@ -81,28 +87,29 @@
     <section class="stage">
       <div class="video-tile video-tile-remote video-square" id="remote-tile">
         <div class="avatar" id="remote-avatar" aria-label="Avatar da outra pessoa">:)</div>
-        <video id="remote-video" autoplay playsinline data-empty="true"></video>
+        <video id="remote-video" muted autoplay playsinline data-empty="true"></video>
         <audio id="remote-audio" autoplay></audio>
         <div class="tile-empty-state" id="remote-empty">
-          <span>esperando a outra pessoa entrar...</span>
+          <span>Envie o código e espere sua companhia.</span>
         </div>
-        <span class="tile-label">user</span>
+        <span class="tile-label">Sua companhia</span>
         <div class="video-actions">
           <button id="btn-fullscreen" type="button">Tela cheia</button>
         </div>
         <div id="remote-context-menu" class="context-menu" hidden>
-          <button id="btn-remote-mute" type="button">Mutar live</button>
-          <label class="context-volume" for="remote-volume">
-            <span>Volume <output id="remote-volume-value">100%</output></span>
+          <button id="btn-remote-mute" type="button">Silenciar áudio</button>
+
+        </div>
+        <label class="volume-panel" for="remote-volume">
+            <span>Áudio da chamada <output id="remote-volume-value">100%</output></span>
             <input id="remote-volume" type="range" min="0" max="200" value="100" step="1" />
           </label>
-        </div>
       </div>
 
       <div class="video-tile video-tile-local video-square" id="local-tile">
         <div class="avatar" id="local-avatar" aria-label="Seu avatar">:)</div>
         <video id="local-video" autoplay playsinline muted></video>
-        <span class="tile-label" id="local-tile-label">user</span>
+        <span class="tile-label" id="local-tile-label">Você</span>
       </div>
     </section>
 
@@ -110,37 +117,37 @@
       <button id="btn-mute" class="dock-btn" type="button" aria-pressed="false" aria-label="Mutar microfone">
         <svg class="icon icon-mic-on" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Z" stroke="currentColor" stroke-width="1.8"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         <svg class="icon icon-mic-off" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V9m0-3a3 3 0 0 0-6 0v6c0 .4.06.78.17 1.14M19 11a7 7 0 0 1-1.68 4.56M12 18v3M3 3l18 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-        <span class="dock-btn-label">mudo</span>
+        <span class="dock-btn-label">Microfone</span>
       </button>
 
-      <button id="btn-camera" class="dock-btn" type="button" aria-pressed="false" aria-label="Desligar camera">
+      <button id="btn-camera" class="dock-btn" type="button" aria-pressed="false" aria-label="Ativar câmera">
         <svg class="icon icon-cam-on" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h9A1.5 1.5 0 0 1 15 7.5v9A1.5 1.5 0 0 1 13.5 18h-9A1.5 1.5 0 0 1 3 16.5v-9Z" stroke="currentColor" stroke-width="1.8"/><path d="m15 10 5.15-3.09c.56-.34 1.28.07 1.28.72v8.74c0 .65-.72 1.06-1.28.72L15 14" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
         <svg class="icon icon-cam-off" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h6.79M15 8.62V7.5A1.5 1.5 0 0 0 13.5 6h-1M15 10l5.15-3.09c.56-.34 1.28.07 1.28.72v8.74c0 .65-.72 1.06-1.28.72L15 14m0 2.5A1.5 1.5 0 0 1 13.5 18h-9A1.5 1.5 0 0 1 3 16.5V9m18-6L3 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="dock-btn-label">camera</span>
+        <span class="dock-btn-label">Câmera</span>
       </button>
 
       <button id="btn-share" class="dock-btn" type="button" aria-pressed="false" aria-label="Compartilhar tela">
         <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="4.5" width="18" height="12" rx="1.5" stroke="currentColor" stroke-width="1.8"/><path d="M9 20h6M12 16.5V20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m9.5 12 2-2 2 2M11.5 10v4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="dock-btn-label">tela</span>
+        <span class="dock-btn-label">Tela</span>
       </button>
 
       <button id="btn-leave" class="dock-btn dock-btn-danger" type="button" aria-label="Sair da chamada">
         <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 15v-2.2C4 8.6 7.6 5 12 5s8 3.6 8 7.8V15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4.5 14.2h3a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2v-1.3a.5.5 0 0 1 .5-.5ZM19.5 14.2h-3a1 1 0 0 0-1 1V18a1 1 0 0 0 1 1H18a2 2 0 0 0 2-2v-1.3a.5.5 0 0 0-.5-.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
-        <span class="dock-btn-label">sair</span>
+        <span class="dock-btn-label">Sair</span>
       </button>
     </footer>
   </main>
 
   <!-- ===================== MODAL: escolher tela/janela para compartilhar ===================== -->
   <div id="source-modal" class="modal-overlay" hidden>
-    <div class="modal-card">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="source-title">
       <div class="modal-header">
-        <h2>Compartilhar tela</h2>
+        <h2 id="source-title">O que vamos compartilhar?</h2>
         <button id="source-modal-close" class="modal-close" type="button" aria-label="Fechar">×</button>
       </div>
       <label class="screen-audio-option">
         <input id="include-system-audio" type="checkbox" />
-        <span>Compartilhar Áudio</span>
+        <span>Incluir áudio da tela ou janela</span>
       </label>
       <div id="source-grid" class="source-grid"></div>
       <button id="stop-screen-share" class="stop-share-button" type="button" hidden>Parar compartilhamento</button>

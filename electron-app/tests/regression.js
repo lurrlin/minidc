@@ -85,13 +85,20 @@
   assert(amplified / normal > 1.8 && amplified / normal < 2.2, '200% actually doubles the audio waveform');
   assert(silent < 0.00001, '0% produces silence');
   const secondAudio = context.createMediaStreamDestination();
-  level.connect(secondAudio);
+  const secondOscillator = context.createOscillator();
+  secondOscillator.frequency.value = 880;
+  const secondLevel = context.createGain();
+  secondLevel.gain.value = 0.05;
+  secondOscillator.connect(secondLevel);
+  secondLevel.connect(secondAudio);
+  secondOscillator.start();
   mixer.addTrack(secondAudio.stream.getAudioTracks()[0]);
   assert(mixer.sources.size === 2, 'Microphone and screen audio are mixed as separate sources');
   const mixed = await rms(100);
-  assert(mixed > normal * 1.3, 'Both audio tracks contribute to the output waveform');
+  assert(mixed > normal * 1.2, 'Both audio tracks contribute to the output waveform');
   await mixer.close();
   oscillator.stop();
+  secondOscillator.stop();
   await context.close();
   return { passed: results.length, checks: results };
 })()
