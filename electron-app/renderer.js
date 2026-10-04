@@ -1,20 +1,3 @@
-/**
- * renderer.js - Toda a logica de chamada (roda no Renderer Process)
- * --------------------------------------------------------------------
- * Sem nodeIntegration: este arquivo so enxerga `window.electronAPI`
- * (exposto pelo preload.js) e `window.APP_CONFIG` (config.js).
- *
- * Fluxo resumido:
- *  1. Usuario digita o nome da sala -> conecta no signaling server (Socket.io)
- *     e emite "join-room".
- *  2. O servidor avisa quem foi o PRIMEIRO a entrar (isFirstPeer). Quando o
- *     segundo entra, o servidor manda "peer-joined" so pro primeiro -> ele
- *     cria a offer. Isso evita "glare" (os dois ofertando ao mesmo tempo).
- *  3. Offer/answer/ICE candidates trafegam via evento "signal", so texto,
- *     nunca midia.
- *  4. Depois que a RTCPeerConnection conecta, audio/video vao 100% P2P
- *     (o signaling server nunca mais é usado ate a proxima sala/reconexao).
- */
 
 (() => {
   const CONFIG = window.APP_CONFIG;

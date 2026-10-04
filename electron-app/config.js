@@ -1,21 +1,7 @@
-/**
- * config.js
- * ----------
- * Unico lugar que voce precisa editar depois de hospedar o signaling
- * server (Render/Railway/etc). Fica separado de renderer.js de proposito,
- * para nao mexer na logica do WebRTC so para trocar uma URL.
- */
 
 window.APP_CONFIG = {
-  // Troque pela URL publica do seu signaling server depois do deploy.
-  // Durante o desenvolvimento local, deixe como esta (server.js na porta 3000).
   SIGNALING_SERVER_URL: 'https://minidc-vn9a.onrender.com',
 
-  // Configuracao ICE do WebRTC. STUN publico do Google resolve a maioria
-  // das redes domesticas. Se, depois de testar, a chamada nunca conectar
-  // entre as duas casas (comum em redes com CGNAT / NAT simetrico - bem
-  // frequente no Brasil), adicione um servidor TURN aqui. Sem TURN, o STUN
-  // sozinho as vezes nao é suficiente para atravessar certos roteadores.
   ICE_SERVERS: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
