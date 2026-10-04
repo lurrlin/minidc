@@ -30,7 +30,16 @@ Crie uma sala, copie o código e envie para a outra pessoa. Ela usa **Entrar em 
 - **Áudio da chamada:** slider visível no vídeo remoto, de 0% a 200%. Controla a mistura da voz e do áudio compartilhado. Acima de 100% aplica ganho real; sinais já muito altos podem distorcer.
 - **Clique no vídeo:** destaca aquela tela; os controles de volume não mudam seu tamanho.
 - **Tela cheia:** mantém a imagem sem espelhamento e o volume acessível.
-- **Configurações:** escolhe microfone e saída, ajusta ganho de entrada/saída e processamento de voz. Escape fecha os painéis.
+- **Tela cheia:** o mesmo botão muda para **Sair da tela cheia**; Escape também sai.
+- **Configurações:** escolhe microfone e saída e ajusta ganho de entrada/saída. Redução de ruído, cancelamento de eco e ganho automático reabrem a captura com as opções exigidas, confirmam o resultado no microfone e substituem a voz enviada sem renegociar a chamada. Os estados **Ativo**, **Desligado** e **Indisponível** refletem a captura. Se uma mudança falhar, o microfone anterior permanece ativo. Escape fecha os painéis.
+
+## Perfil local e compartilhado
+
+Na tela inicial, use **Editar nome e foto** abaixo das opções de sala. Escolha seu nome (até 40 caracteres) e uma foto JPG, PNG ou WebP (até 8 MB), ou remova a foto para usar suas iniciais. A imagem é recortada ao centro e reduzida para 256 × 256 antes de salvar. **Salvar perfil** confirma as escolhas; fechar o editor descarta as alterações ainda não salvas.
+
+O perfil fica no armazenamento local do aplicativo neste computador, dentro dos dados de usuário do Electron. Ele continua disponível ao reabrir o app e pode ser alterado novamente na tela inicial. Nome e foto aparecem nos avatares e nomes da chamada.
+
+Um canal de dados WebRTC envia o perfil diretamente à outra pessoa quando a conexão abre, inclusive após reentrar na sala. O servidor de sinalização não recebe o conteúdo do perfil. Ambos os participantes precisam usar a versão com suporte a perfis.
 
 ## Arquitetura
 
@@ -45,6 +54,9 @@ electron-app/
   preload.js         Ponte explícita entre Electron e interface
   config.js          URL de sinalização e servidores ICE
   media.js           Associação de canais WebRTC e mistura de áudio
+  microphone.js      Restrições verificadas de voz e criação de ganho
+  profile.js         Validação, persistência, foto e canal P2P do perfil
+  profile-ui.js      Editor de perfil da tela inicial
   renderer.js        Ciclo da chamada, dispositivos e controles
   index.html         Interface em português
   style.css          Tema, layouts e estados visuais
@@ -71,7 +83,9 @@ Os testes do aplicativo usam o Chromium incluído no Electron, vídeo gerado por
 
 Os testes do servidor usam uma porta local aleatória e conferem limite de participantes, validação, encaminhamento restrito à sala, colisão com identificadores internos, mensagens inválidas, saída/reentrada e limpeza de salas.
 
-Os testes simulados não substituem a conferência entre dois computadores de captura nativa de áudio, permissões do sistema, seleção física de saída e comportamento de redes/NAT diferentes.
+Os testes também conferem entrada/saída de tela cheia, persistência de nome/foto, compressão da foto e envio pelo canal de dados P2P. Para cada opção de processamento de voz, ligam e desligam a opção, verificam as configurações efetivas da captura e a preservação de mudo e da saída enviada. Uma falha simulada verifica a manutenção do microfone anterior. Os perfis de teste usam armazenamento temporário isolado dos dados reais do usuário.
+
+Os testes simulados não substituem a conferência entre dois computadores de captura nativa de áudio, eficácia acústica da redução de ruído/eco em microfones físicos, permissões do sistema, seleção física de saída e comportamento de redes/NAT diferentes.
 
 ## Gerar instalador
 
