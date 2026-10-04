@@ -66,6 +66,11 @@
       </div>
 
       <p id="lobby-status" class="lobby-status" role="status" aria-live="polite"></p>
+      <button id="edit-profile" class="profile-entry" type="button">
+        <span id="lobby-profile-avatar" class="profile-avatar" aria-hidden="true"></span>
+        <span><strong id="lobby-profile-name">Seu perfil</strong><small>Editar nome e foto</small></span>
+        <span class="profile-entry-arrow" aria-hidden="true">↗</span>
+      </button>
     </section>
   </main>
 
@@ -92,7 +97,7 @@
         <div class="tile-empty-state" id="remote-empty">
           <span>Envie o código e espere sua companhia.</span>
         </div>
-        <span class="tile-label">Sua companhia</span>
+        <span class="tile-label" id="remote-tile-label">Sua companhia</span>
         <div class="video-actions">
           <button id="btn-fullscreen" type="button">Tela cheia</button>
         </div>
@@ -180,23 +185,52 @@
       <label class="settings-toggle">
         <input id="settings-noise-suppression" type="checkbox" checked />
         <span>Redução de ruído</span>
+        <small id="noiseSuppression-status"></small>
       </label>
       <label class="settings-toggle">
         <input id="settings-echo-cancellation" type="checkbox" checked />
         <span>Cancelamento de eco</span>
+        <small id="echoCancellation-status"></small>
       </label>
       <label class="settings-toggle">
         <input id="settings-auto-gain" type="checkbox" checked />
         <span>Ganho automático</span>
+        <small id="autoGainControl-status"></small>
       </label>
+      <p id="audio-processing-status" class="profile-description" role="status" aria-live="polite"></p>
     </section>
   </div>
 
   <!-- Toast de erro/aviso -->
+  <div id="profile-modal" class="modal-overlay" hidden>
+    <form id="profile-form" class="modal-card profile-card" role="dialog" aria-modal="true" aria-labelledby="profile-title">
+      <div class="modal-header">
+        <h2 id="profile-title">Seu perfil</h2>
+        <button id="profile-close" class="modal-close" type="button" aria-label="Fechar">×</button>
+      </div>
+      <p class="profile-description">Sua companhia verá esse nome e essa foto na chamada.</p>
+      <div class="profile-photo-row">
+        <div id="profile-preview" class="profile-avatar"></div>
+        <div class="profile-photo-actions">
+          <label class="btn btn-secondary" for="profile-photo">Escolher foto</label>
+          <input id="profile-photo" type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" />
+          <button id="profile-remove-photo" class="profile-remove" type="button">Remover foto</button>
+        </div>
+      </div>
+      <label class="settings-field" for="profile-name"><span>Como você quer ser chamado?</span>
+        <input id="profile-name" class="room-input" type="text" maxlength="40" placeholder="Seu nome" autocomplete="nickname" />
+      </label>
+      <p id="profile-status" class="profile-description" role="status">Salvo apenas neste computador.</p>
+      <button id="profile-save" class="btn btn-primary" type="submit">Salvar perfil</button>
+    </form>
+  </div>
   <div id="toast" class="toast" role="alert" hidden></div>
 
   <script src="config.js"></script>
   <script src="media.js"></script>
+  <script src="microphone.js"></script>
+  <script src="profile.js"></script>
+  <script src="profile-ui.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

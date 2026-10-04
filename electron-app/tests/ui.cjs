@@ -3,9 +3,10 @@ const path = require('node:path');
 const fs = require('node:fs');
 
 module.exports = async function testUI() {
-  const windows = [0, 1].map(() => new BrowserWindow({ show: false, width: 1200, height: 800, webPreferences: { offscreen: true, preload: path.join(__dirname, 'preload.cjs') } }));
+  const windows = [0, 1].map((index) => new BrowserWindow({ show: false, width: 1200, height: 800, webPreferences: { offscreen: true, partition: `persist:peer-${index}`, preload: path.join(__dirname, 'preload.cjs') } }));
   windows.forEach((window, index) => window.webContents.on('console-message', (_event, level, message) => { if (level >= 2) console.log(`UI P${index + 1}: ${message}`); }));
   const participants = new Map();
+  let profileWasSignaled = false;
   const checks = [];
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const evaluate = (index, code) => windows[index].webContents.executeJavaScript(code, true);
@@ -17,6 +18,7 @@ module.exports = async function testUI() {
       send(sender, 'joined-room', { roomName: payload, isFirstPeer: !peers.length });
       peers.forEach(([peer]) => send(peer, 'peer-joined'));
     } else if (event === 'signal') {
+      if (payload.data.type === 'profile' || JSON.stringify(payload.data).includes('"photo":')) profileWasSignaled = true;
       for (const [peer, room] of participants) if (peer !== sender && room === payload.roomName) send(peer, 'signal', payload.data);
     } else if (event === 'check-room') {
       const size = [...participants.values()].filter((room) => room === payload).length;
@@ -40,12 +42,49 @@ module.exports = async function testUI() {
   fs.mkdirSync(artifacts, { recursive: true });
   try {
     for (const window of windows) await window.loadFile(path.join(__dirname, '../index.html'));
+    for (let i = 0; i < 2; i++) {
+      await evaluate(i, `document.getElementById('edit-profile').click(); document.getElementById('profile-name').value = '${i ? 'Bia' : 'Alex'}'; document.getElementById('profile-name').dispatchEvent(new Event('input'));`);
+      await evaluate(i, `(async () => {
+        const canvas = document.createElement('canvas'); canvas.width = 480; canvas.height = 320;
+        const context = canvas.getContext('2d'); context.fillStyle = '${i ? '#8dd5b8' : '#c4b4f7'}'; context.fillRect(0, 0, 480, 320);
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+        const transfer = new DataTransfer(); transfer.items.add(new File([blob], 'avatar.png', { type: 'image/png' }));
+        document.getElementById('profile-photo').files = transfer.files;
+        document.getElementById('profile-photo').dispatchEvent(new Event('change'));
+      })()`);
+      await until(i, `!document.getElementById('profile-save').disabled`);
+      await evaluate(i, `document.getElementById('profile-form').requestSubmit()`);
+      await until(i, `document.getElementById('profile-modal').hidden`);
+    }
+    assert(await evaluate(0, `document.getElementById('lobby-profile-name').textContent === 'Alex' && !!document.querySelector('#lobby-profile-avatar img')`), 'Lobby profile editor saves the name and selected photo');
+    assert(await evaluate(0, `UserProfile.load().photo.startsWith('data:image/jpeg;base64,') && UserProfile.load().photo.length < 60000`), 'Avatar is resized and compressed before storage and transmission');
+    await evaluate(0, `document.getElementById('edit-profile').click(); document.getElementById('profile-name').value = 'Discarded'; document.getElementById('profile-close').click()`);
+    assert(await evaluate(0, `ProfileUI.getProfile().name === 'Alex'`), 'Closing the profile editor discards unsaved changes');
+    await evaluate(0, `document.getElementById('edit-profile').click()`);
+    await wait(100);
+    fs.writeFileSync(path.join(artifacts, 'profile.png'), (await windows[0].webContents.capturePage()).toPNG());
+    await evaluate(0, `document.getElementById('profile-close').click()`);
     fs.writeFileSync(path.join(artifacts, 'lobby.png'), (await windows[0].webContents.capturePage()).toPNG());
     for (let i = 0; i < 2; i++) await evaluate(i, `
       window.APP_CONFIG.ICE_SERVERS = [];
+      window.__microphoneCaptures = [];
+      window.__outgoingMicrophoneTracks = [];
+      const originalReplaceTrack = RTCRtpSender.prototype.replaceTrack;
+      RTCRtpSender.prototype.replaceTrack = async function(track) {
+        await originalReplaceTrack.call(this, track);
+        if (track?.kind === 'audio') window.__outgoingMicrophoneTracks.push(track);
+      };
       const originalCapture = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
       navigator.mediaDevices.getUserMedia = async (options) => {
-        if (!options.video?.mandatory) return originalCapture(options);
+        if (!options.video?.mandatory) {
+          if (options.audio && window.__failNextMicrophone) {
+            window.__failNextMicrophone = false;
+            throw new DOMException('Simulated unsupported microphone option', 'OverconstrainedError');
+          }
+          const stream = await originalCapture(options);
+          if (options.audio) window.__microphoneCaptures.push({ track: stream.getAudioTracks()[0], constraints: options.audio });
+          return stream;
+        }
         const canvas = document.createElement('canvas');
         canvas.width = 640; canvas.height = 360;
         const context = canvas.getContext('2d');
@@ -66,6 +105,10 @@ module.exports = async function testUI() {
     await evaluate(1, `document.getElementById('show-join-button').click(); document.getElementById('room-input').value = ${JSON.stringify(room)}; document.getElementById('join-form').requestSubmit();`);
     for (let i = 0; i < 2; i++) await until(i, `document.getElementById('connection-dot').classList.contains('conn-connected')`);
     checks.push('Production renderer connects two peers without cameras');
+    await until(0, `document.getElementById('remote-tile-label').textContent === 'Bia' && !!document.querySelector('#remote-avatar img')`);
+    await until(1, `document.getElementById('remote-tile-label').textContent === 'Alex' && !!document.querySelector('#remote-avatar img')`);
+    checks.push('Names and photos reach both partners over a real WebRTC data channel');
+    assert(!profileWasSignaled, 'Profile payloads are never forwarded through the signaling server');
     assert(await evaluate(0, `!document.getElementById('remote-tile').classList.contains('has-video')`), 'Audio-only call displays an avatar instead of a black video');
     await evaluate(1, `document.getElementById('btn-camera').click()`);
     await until(0, `document.getElementById('remote-tile').classList.contains('has-video')`);
@@ -82,6 +125,7 @@ module.exports = async function testUI() {
     checks.push('Production renderer displays P1 and P2 screens simultaneously');
     await evaluate(0, `document.getElementById('btn-fullscreen').click()`);
     await until(0, `document.fullscreenElement === document.getElementById('remote-tile')`);
+    await until(0, `document.getElementById('btn-fullscreen').textContent === 'Sair da tela cheia'`);
     assert(await evaluate(0, `document.getElementById('btn-fullscreen').textContent === 'Sair da tela cheia'`), 'Fullscreen button changes to an explicit exit action');
     await evaluate(0, `document.getElementById('btn-fullscreen').click()`);
     await until(0, `!document.fullscreenElement`);
@@ -113,17 +157,41 @@ module.exports = async function testUI() {
     fs.writeFileSync(path.join(artifacts, 'compact.png'), (await windows[0].webContents.capturePage()).toPNG());
     await evaluate(0, `document.getElementById('open-settings').click()`);
     await until(0, `!document.getElementById('settings-modal').hidden`);
+    await evaluate(0, `document.getElementById('btn-mute').click()`);
+    for (const [key, id] of [
+      ['noiseSuppression', 'settings-noise-suppression'],
+      ['echoCancellation', 'settings-echo-cancellation'],
+      ['autoGainControl', 'settings-auto-gain'],
+    ]) {
+      for (const enabled of [false, true]) {
+        await evaluate(0, `document.getElementById('${id}').click()`);
+        await until(0, `!document.getElementById('${id}').disabled && document.getElementById('audio-processing-status').textContent === 'Opções aplicadas ao microfone e à voz enviada.'`);
+        assert(await evaluate(0, `(() => { const capture = window.__microphoneCaptures.at(-1); return capture.track.getSettings().${key} === ${enabled} && capture.constraints.${key}.exact === ${enabled}; })()`), `${key}=${enabled} is confirmed on the new captured microphone`);
+        assert(await evaluate(0, `!window.__microphoneCaptures.at(-1).track.enabled && window.__outgoingMicrophoneTracks.at(-1).readyState === 'live'`), 'Processing changes preserve mute and feed a live outbound audio track');
+      }
+    }
+    fs.writeFileSync(path.join(artifacts, 'audio-settings.png'), (await windows[0].webContents.capturePage()).toPNG());
+    await evaluate(0, `window.__previousMicrophone = window.__microphoneCaptures.at(-1).track; window.__previousOutput = window.__outgoingMicrophoneTracks.at(-1); window.__failNextMicrophone = true; document.getElementById('settings-noise-suppression').click()`);
+    await until(0, `document.getElementById('audio-processing-status').dataset.tone === 'error'`);
+    assert(await evaluate(0, `document.getElementById('settings-noise-suppression').checked && window.__previousMicrophone.readyState === 'live' && window.__previousOutput === window.__outgoingMicrophoneTracks.at(-1)`), 'Rejected processing option restores the checkbox and preserves the previous microphone pipeline');
+    await evaluate(0, `document.getElementById('btn-mute').click()`);
     assert(await evaluate(0, `(() => { const card = document.querySelector('.settings-card'); return card.scrollHeight >= card.clientHeight && getComputedStyle(card).overflowY === 'auto'; })()`), 'Settings can scroll at the minimum window size');
     await evaluate(0, `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
     assert(await evaluate(0, `document.getElementById('settings-modal').hidden`), 'Escape closes settings');
     await evaluate(0, `document.getElementById('btn-leave').click()`);
     await until(0, `!document.getElementById('lobby-screen').hidden`);
+    await evaluate(0, `document.getElementById('edit-profile').click(); document.getElementById('profile-name').value = 'Alex Novo'; document.getElementById('profile-form').requestSubmit();`);
     await wait(150);
     await evaluate(0, `document.getElementById('show-join-button').click(); document.getElementById('room-input').value = ${JSON.stringify(room)}; document.getElementById('join-form').requestSubmit();`);
     for (let i = 0; i < 2; i++) await until(i, `document.getElementById('connection-dot').classList.contains('conn-connected')`);
     checks.push('Leaving and rejoining promotes the remaining peer and reconnects');
     await until(0, `document.getElementById('remote-video').getVideoPlaybackQuality().totalVideoFrames > 0 && document.getElementById('remote-video').videoWidth > 0`);
     checks.push('Active screen sharing survives the other participant rejoining');
+    await until(1, `document.getElementById('remote-tile-label').textContent === 'Alex Novo'`);
+    checks.push('An edited profile is shared again after rejoining');
+    await evaluate(0, `document.getElementById('btn-leave').click()`);
+    await windows[0].loadFile(path.join(__dirname, '../index.html'));
+    assert(await evaluate(0, `ProfileUI.getProfile().name === 'Alex Novo' && !!document.querySelector('#lobby-profile-avatar img')`), 'Profile choices persist after recreating the page');
     return checks;
   } finally {
     ipcMain.removeListener('test:socket', relay);

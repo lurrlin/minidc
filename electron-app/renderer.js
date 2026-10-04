@@ -100,14 +100,60 @@
   let microphoneGainContext = null;
   let microphoneGainNode = null;
   let microphoneGainDestination = null;
+  let microphoneUpdating = false;
+  const audioSettings = {
+    noiseSuppression: settingsNoiseSuppression,
+    echoCancellation: settingsEchoCancellation,
+    autoGainControl: settingsAutoGain,
+  };
+
+  function requestedProcessing() {
+    return Object.fromEntries(Object.entries(audioSettings).map(([key, input]) => [key, input.checked]));
+  }
+
+  function syncProcessingSettings(track = localStream?.getAudioTracks()[0]) {
+    const supported = navigator.mediaDevices.getSupportedConstraints();
+    const actual = track?.getSettings() || {};
+    for (const [key, input] of Object.entries(audioSettings)) {
+      const available = supported[key] && typeof actual[key] === 'boolean';
+      input.disabled = microphoneUpdating || !available;
+      if (available) input.checked = actual[key];
+      const status = document.getElementById(`${key}-status`);
+      status.textContent = available ? actual[key] ? 'Ativo' : 'Desligado' : 'Indisponível';
+      status.dataset.active = String(available && actual[key]);
+    }
+  }
+  let profileChannel = null;
+  let remoteProfile = { name: '', photo: '' };
+
+  function renderProfiles() {
+    const local = window.ProfileUI.getProfile();
+    window.UserProfile.renderAvatar(document.getElementById('local-avatar'), local);
+    window.UserProfile.renderAvatar(document.getElementById('remote-avatar'), remoteProfile, 'Sua companhia');
+    localTileLabel.textContent = local.name ? `${local.name} · ${screenStream ? 'tela' : 'você'}` : screenStream ? 'Sua tela' : 'Você';
+    const remoteName = remoteProfile.name || 'Sua companhia';
+    document.getElementById('remote-tile-label').textContent = remoteTile.classList.contains('screen-share') ? `${remoteName} · tela` : remoteName;
+  }
+
+  function bindProfileChannel(channel) {
+    profileChannel = channel;
+    window.UserProfile.attachChannel(channel, window.ProfileUI.getProfile, (profile) => {
+      if (profileChannel !== channel) return;
+      remoteProfile = profile;
+      renderProfiles();
+    });
+  }
+
+  window.addEventListener('profilechange', () => {
+    renderProfiles();
+    if (profileChannel?.readyState === 'open') {
+      profileChannel.send(JSON.stringify({ type: 'profile', profile: window.ProfileUI.getProfile() }));
+    }
+  });
+  renderProfiles();
 
   function getMicrophoneConstraints(deviceId = selectedMicrophoneId) {
-    return {
-      ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
-      echoCancellation: settingsEchoCancellation.checked,
-      noiseSuppression: settingsNoiseSuppression.checked,
-      autoGainControl: settingsAutoGain.checked,
-    };
+    return window.MicrophoneAudio.constraints(deviceId, requestedProcessing());
   }
 
   // ---------------------------------------------------------------------
@@ -166,6 +212,7 @@
     setJoining(false);
     setLobbyStatus('');
     resetLobbyMode();
+    renderProfiles();
   }
 
   function setJoining(value) {
@@ -263,6 +310,7 @@
     }
 
     cameraTrack = null;
+    syncProcessingSettings();
     localVideo.srcObject = localStream;
     attachSpeakingIndicator(localStream, localTile);
     await refreshMicrophones();
@@ -286,41 +334,82 @@
     }
   }
 
-  async function changeMicrophone() {
-    if (!localStream || !settingsMicrophone.value) return;
+  async function replaceMicrophone(deviceId) {
+    if (!localStream || microphoneUpdating) return false;
+    const stream = localStream;
+    const connection = pc;
+    const requested = requestedProcessing();
+    microphoneUpdating = true;
+    settingsMicrophone.disabled = true;
+    settingsInputVolume.disabled = true;
+    Object.values(audioSettings).forEach((input) => { input.disabled = true; });
+    let nextStream;
+    let pipeline;
     try {
-      const nextStream = await navigator.mediaDevices.getUserMedia({
-        audio: getMicrophoneConstraints(settingsMicrophone.value),
+      nextStream = await navigator.mediaDevices.getUserMedia({
+        audio: window.MicrophoneAudio.constraints(deviceId, requested),
         video: false,
       });
       const nextTrack = nextStream.getAudioTracks()[0];
-      await stopMicrophoneVolume();
-      const currentTrack = localStream.getAudioTracks()[0];
+      window.MicrophoneAudio.verify(nextTrack, requested);
+      if (pc !== connection || localStream !== stream) return false;
+      const currentTrack = stream.getAudioTracks()[0];
       nextTrack.enabled = currentTrack?.enabled ?? true;
-      if (microphoneSender) await microphoneSender.replaceTrack(nextTrack);
-      localStream.removeTrack(currentTrack);
+      pipeline = await window.MicrophoneAudio.createGain(nextTrack, settingsInputVolume.value);
+      if (pc !== connection || localStream !== stream) return false;
+      await microphoneSender.replaceTrack(pipeline.destination.stream.getAudioTracks()[0]);
+      if (pc !== connection || localStream !== stream) return false;
+      const previousContext = microphoneGainContext;
+      const previousDestination = microphoneGainDestination;
+      microphoneGainContext = pipeline.context;
+      microphoneGainNode = pipeline.gain;
+      microphoneGainDestination = pipeline.destination;
+      pipeline = null;
+      stream.removeTrack(currentTrack);
+      stream.addTrack(nextTrack);
+      nextStream = null;
       currentTrack?.stop();
-      localStream.addTrack(nextTrack);
-      selectedMicrophoneId = settingsMicrophone.value;
+      previousDestination?.stream.getTracks().forEach((track) => track.stop());
+      await previousContext?.close();
+      selectedMicrophoneId = deviceId;
       attachSpeakingIndicator(localStream, localTile);
-      await applyMicrophoneVolume();
-      showToast('Microfone alterado.', 'info', 2500);
-    } catch (err) {
-      showToast('Nao foi possivel trocar o microfone.', 'error');
-      console.error(err);
+      return true;
+    } finally {
+      nextStream?.getTracks().forEach((track) => track.stop());
+      if (pipeline) {
+        pipeline.destination.stream.getTracks().forEach((track) => track.stop());
+        await pipeline.context.close();
+      }
+      microphoneUpdating = false;
+      settingsMicrophone.disabled = false;
+      settingsInputVolume.disabled = false;
+      syncProcessingSettings();
+    }
+  }
+
+  async function changeMicrophone() {
+    if (!localStream || !settingsMicrophone.value) return;
+    try {
+      if (await replaceMicrophone(settingsMicrophone.value)) showToast('Microfone alterado.', 'info', 2500);
+    } catch (error) {
+      showToast('Não foi possível trocar o microfone. O anterior continua ativo.', 'error');
+      console.error(error);
       await refreshMicrophones();
     }
   }
 
   async function applyAudioProcessingSettings() {
-    const microphoneTrack = localStream?.getAudioTracks()[0];
-    if (!microphoneTrack) return;
+    if (!localStream || microphoneUpdating) return;
+    const status = document.getElementById('audio-processing-status');
+    status.textContent = 'Aplicando ao microfone…';
     try {
-      await microphoneTrack.applyConstraints(getMicrophoneConstraints(selectedMicrophoneId));
-      showToast('Tratamento de audio atualizado.', 'info', 2500);
+      if (!await replaceMicrophone(selectedMicrophoneId)) return;
+      status.textContent = 'Opções aplicadas ao microfone e à voz enviada.';
+      status.dataset.tone = '';
     } catch (err) {
-      showToast('Nao foi possivel aplicar esse tratamento de audio.', 'error');
-      console.error('Erro aplicando tratamento de audio:', err);
+      status.textContent = 'O dispositivo não aplicou essa opção. Mantivemos a configuração anterior.';
+      status.dataset.tone = 'error';
+      console.error('Erro aplicando tratamento de áudio:', err.name, err.message, err.constraint || '');
     }
   }
 
@@ -342,7 +431,7 @@
   }
 
   async function applyMicrophoneVolume() {
-    if (!localStream || !microphoneSender) return;
+    if (!localStream || !microphoneSender || microphoneUpdating) return;
     const sourceTrack = localStream.getAudioTracks()[0];
     if (!sourceTrack) return;
     if (!microphoneGainNode) {
@@ -386,6 +475,7 @@
     try {
       await Promise.all([refreshMicrophones(), refreshAudioOutputs()]);
       settingsModal.hidden = false;
+      syncProcessingSettings();
       settingsCloseButton.focus();
     } catch (error) {
       console.error(error);
@@ -684,8 +774,10 @@
           remoteVideoEnabled = true;
           remoteTile.classList.add('has-video');
           updateTileLayout();
+          renderProfiles();
         } else if (data.type === 'screen-share-stop') {
           remoteTile.classList.remove('screen-share');
+          renderProfiles();
         } else if (data.type === 'video-state') {
           remoteVideoEnabled = Boolean(data.enabled);
           remoteTile.classList.toggle('has-video', remoteVideoEnabled);
@@ -710,6 +802,9 @@
       remoteMixer = null;
       isInitiator = true;
       remotePeerReady = false;
+      remoteProfile = { name: '', photo: '' };
+      profileChannel = null;
+      renderProfiles();
       remoteVideoEnabled = null;
       pendingSignals = [];
       updateTileLayout();
@@ -769,6 +864,12 @@
     if (isInitiator) await applyMicrophoneVolume();
 
     const connection = pc;
+    profileChannel = null;
+    if (isInitiator) bindProfileChannel(connection.createDataChannel('profile'));
+    connection.ondatachannel = ({ channel }) => {
+      if (pc === connection && channel.label === 'profile') bindProfileChannel(channel);
+      else channel.close();
+    };
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
@@ -1111,6 +1212,7 @@
     localTile.classList.add('has-video');
     updateTileLayout();
     localTileLabel.textContent = 'Sua tela';
+    renderProfiles();
     sendSignal({ type: 'screen-share-start' });
     sendSignal({ type: 'video-state', enabled: true });
 
@@ -1143,6 +1245,7 @@
     localTile.classList.toggle('has-video', Boolean(cameraTrack?.enabled));
     updateTileLayout();
     localTileLabel.textContent = 'Você';
+    renderProfiles();
     btnShare.setAttribute('aria-pressed', 'false');
     sendSignal({ type: 'screen-share-stop' });
     sendSignal({ type: 'video-state', enabled: Boolean(cameraTrack?.enabled) });
@@ -1171,6 +1274,8 @@
     cameraTrack = null;
     screenStream = null;
     remoteVideoEnabled = null;
+    profileChannel = null;
+    remoteProfile = { name: '', photo: '' };
     currentRoom = null;
     isInitiator = false;
     hasJoinedOnce = false;
@@ -1204,6 +1309,7 @@
     settingsModal.hidden = true;
     closeSourcePicker();
     localTileLabel.textContent = 'Você';
+    renderProfiles();
     remoteTile.classList.remove('screen-share');
     remoteTile.classList.remove('has-video');
     document.getElementById('remote-empty').textContent = 'Envie o código e espere sua companhia.';

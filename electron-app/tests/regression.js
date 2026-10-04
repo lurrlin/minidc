@@ -73,9 +73,15 @@
   const samples = new Float32Array(analyser.fftSize);
   async function rms(volume) {
     await mixer.setVolume(volume);
-    await wait(140);
-    analyser.getFloatTimeDomainData(samples);
-    return Math.sqrt(samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length);
+    const deadline = mixer.context.currentTime + 0.2;
+    for (let attempt = 0; mixer.context.currentTime < deadline && attempt < 30; attempt++) await wait(30);
+    let total = 0;
+    for (let sample = 0; sample < 5; sample++) {
+      await wait(35);
+      analyser.getFloatTimeDomainData(samples);
+      total += Math.sqrt(samples.reduce((sum, value) => sum + value * value, 0) / samples.length);
+    }
+    return total / 5;
   }
   const normal = await rms(100);
   const half = await rms(50);
