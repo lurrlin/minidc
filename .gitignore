@@ -1,0 +1,25 @@
+# Dependencies and generated builds belong outside the repository.
+node_modules/
+dist/
+coverage/
+electron-app/tests/artifacts/
+*.log
+*.exe
+*.msi
+*.dmg
+*.blockmap
+
+# Local configuration and signing credentials.
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local OS/editor files.
+.DS_Store
+Thumbs.db
+Desktop.ini

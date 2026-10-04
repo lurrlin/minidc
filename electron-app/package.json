@@ -27,7 +27,8 @@
     "productName": "unme",
     "files": [
       "**/*",
-      "!**/{.gitignore,.env,.env.example}"
+      "!tests{,/**/*}",
+      "!**/{.gitignore,.env,.env.*,*.log,*.pem,*.key,*.p12,*.pfx}"
     ],
     "directories": {
       "output": "dist"
