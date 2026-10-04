@@ -1,180 +1,99 @@
-# Mini Discord — chamada P2P para 2 pessoas
+# Unme
 
-App desktop (Windows/Mac) com audio, video e compartilhamento de tela,
-feito com Electron + WebRTC. Sem servidor de midia: depois do "aperto de
-mao" inicial, video e audio trafegam direto entre os dois computadores.
+Aplicativo desktop para duas pessoas, com voz, câmera e compartilhamento simultâneo de tela. Feito com Electron, WebRTC e Socket.IO.
 
-## 1. Estrutura de pastas
+## Rodar o projeto
 
-```
-mini-discord/
-├── signaling-server/       # Node.js + Express + Socket.io — SO troca SDP/ICE
-│   ├── server.js
-│   ├── package.json
-│   ├── .env.example
-│   └── .gitignore
-│
-└── electron-app/           # O app instalável
-    ├── main.js             # Main process: janela + desktopCapturer + IPC
-    ├── preload.js           # Ponte segura (contextBridge) Main <-> Renderer
-    ├── config.js            # URL do signaling server + ICE servers (STUN/TURN)
-    ├── index.html            # UI (lobby + tela de chamada + seletor de tela)
-    ├── style.css              # Dark mode
-    ├── renderer.js             # Toda a lógica de WebRTC / Socket.io
-    ├── package.json
-    └── .gitignore
-```
+Use Node.js 22 ou mais recente e npm. São dois processos separados:
 
-Por que separado assim: o signaling server não sabe nada sobre WebRTC além
-de repassar mensagens — pode ficar hospedado 24h de graça em algo como
-Render ou Railway. O app Electron é só instalado nos dois computadores e
-aponta para essa URL.
-
-## 2. Pré-requisitos
-
-- Node.js 18+ e npm instalados nos dois computadores (e na máquina de onde
-  você vai fazer o deploy do signaling server, se for a mesma).
-- Uma conta grátis em [Render](https://render.com) ou
-  [Railway](https://railway.app) para hospedar o `signaling-server`.
-
-## 3. Signaling server
-
-### 3.1 Rodando localmente (para testar)
-
-```bash
+```powershell
+# Terminal 1 — servidor local
 cd signaling-server
-npm install
+npm ci
 npm start
-# "Signaling server ouvindo na porta 3000"
-```
 
-### 3.2 Deploy (Render, exemplo)
-
-1. Suba a pasta `signaling-server/` para um repositório Git (pode ser um
-   repo privado só para isso).
-2. No Render: **New > Web Service** → conecte o repo.
-   - **Build command:** `npm install`
-   - **Start command:** `npm start`
-   - Nenhuma variável de ambiente é obrigatória (o `PORT` é injetado
-     automaticamente pelo Render).
-3. Ao terminar o deploy, copie a URL pública, algo como
-   `https://mini-discord-signaling.onrender.com`.
-
-No Railway o processo é equivalente (New Project → Deploy from GitHub repo
-→ ele detecta o `npm start` sozinho).
-
-> **Nota sobre planos gratuitos:** Render/Railway free tier costuma
-> "dormir" o serviço depois de alguns minutos sem uso e leva ~30s para
-> acordar na próxima conexão. Isso só atrasa a entrada na sala — não afeta
-> a chamada em si, que já é P2P direto.
-
-## 4. Electron app
-
-### 4.1 Configurar a URL do servidor
-
-Abra `electron-app/config.js` e troque:
-
-```js
-SIGNALING_SERVER_URL: 'http://localhost:3000',
-```
-
-pela URL que você copiou do Render/Railway, ex:
-
-```js
-SIGNALING_SERVER_URL: 'https://mini-discord-signaling.onrender.com',
-```
-
-### 4.2 Rodar em desenvolvimento
-
-```bash
+# Terminal 2 — aplicativo
 cd electron-app
-npm install
+npm ci
 npm start
 ```
 
-Isso abre a janela do Electron já apontando para o signaling server
-configurado. Repita `npm start` no computador da sua namorada (com o
-mesmo `config.js` apontando pro mesmo servidor) e digitem o **mesmo nome
-de sala** nos dois — a chamada conecta sozinha.
+`electron-app/config.js` contém a URL do servidor. Para usar o servidor local, defina `SIGNALING_SERVER_URL` como `http://localhost:3000`. A configuração atual aponta para o servidor hospedado do projeto. As duas pessoas devem usar a mesma URL.
 
-### 4.3 Gerar o instalável (.exe / .dmg)
+Crie uma sala, copie o código e envie para a outra pessoa. Ela usa **Entrar em uma sala**. A chamada começa apenas com microfone; a câmera pode ser ativada depois. Cada participante pode compartilhar sua tela na mesma sala, inclusive ao mesmo tempo.
 
-```bash
-cd electron-app
-npm run dist        # gera para a plataforma atual
-npm run dist:win    # forçar build Windows (.exe via NSIS)
-npm run dist:mac    # forçar build macOS (.dmg)
+## Controles
+
+- **Microfone:** liga ou silencia sua voz.
+- **Câmera:** ativa ou desativa o vídeo, sem precisar reentrar.
+- **Tela:** escolhe uma tela ou janela; permite trocar a fonte ou parar a transmissão. A opção de áudio inclui o som da captura quando disponível.
+- **Áudio da chamada:** slider visível no vídeo remoto, de 0% a 200%. Controla a mistura da voz e do áudio compartilhado. Acima de 100% aplica ganho real; sinais já muito altos podem distorcer.
+- **Clique no vídeo:** destaca aquela tela; os controles de volume não mudam seu tamanho.
+- **Tela cheia:** mantém a imagem sem espelhamento e o volume acessível.
+- **Configurações:** escolhe microfone e saída, ajusta ganho de entrada/saída e processamento de voz. Escape fecha os painéis.
+
+## Arquitetura
+
+```text
+signaling-server/
+  server.js          Salas de até dois participantes; encaminha SDP/ICE e estado de mídia
+  tests/             Testes locais com Socket.IO real
+  package-lock.json  Dependências reproduzíveis
+
+electron-app/
+  main.js            Janela, permissões e captura nativa
+  preload.js         Ponte explícita entre Electron e interface
+  config.js          URL de sinalização e servidores ICE
+  media.js           Associação de canais WebRTC e mistura de áudio
+  renderer.js        Ciclo da chamada, dispositivos e controles
+  index.html         Interface em português
+  style.css          Tema, layouts e estados visuais
+  tests/             Regressões no Chromium do Electron e duas interfaces reais
 ```
 
-Os artefatos saem em `electron-app/dist/`.
+A conexão negocia três canais `sendrecv`: microfone, vídeo e áudio da tela. O primeiro participante cria os canais; o segundo reutiliza os canais da oferta antes de responder. Isso permite transmitir vídeo depois de entrar sem câmera, nos dois sentidos. A troca câmera/tela usa `replaceTrack`, sem nova sala.
 
-> **Importante sobre cross-compiling:** o `electron-builder` só gera
-> `.dmg` assinado corretamente rodando em uma máquina macOS. Se você só
-> tem Windows, rode `npm run dist:win` aí e peça para ela rodar
-> `npm run dist:mac` no Mac dela (ou usar `npm start` direto em modo dev,
-> que também funciona perfeitamente sem gerar instalador).
+O áudio remoto passa por fontes separadas de Web Audio, uma por track, conectadas a um ganho comum e a uma saída reproduzida pelo elemento de áudio. Assim, voz e som da tela são misturados, o ganho de 200% funciona e a seleção de dispositivo de saída permanece disponível.
 
-## 5. Como a arquitetura resolve os pontos "MUITO IMPORTANTE" do briefing
+Ao sair, a aplicação libera tracks, conexões, contextos de áudio, indicadores de fala e timers. Quem permanece na sala assume a iniciativa da próxima conexão. A tela ativa é reanexada quando a outra pessoa volta.
 
-- **`RTCConfiguration` sólida:** `config.js` define STUN público do Google
-  (`stun.l.google.com:19302` + um segundo STUN de backup) e
-  `iceCandidatePoolSize: 10`. Há um slot pronto para adicionar um servidor
-  TURN — veja a seção de troubleshooting abaixo sobre quando isso é
-  necessário.
-- **ICE candidates e reconexão:** candidatos ICE que chegam antes da
-  `remoteDescription` estar pronta são enfileirados e aplicados depois
-  (`pendingCandidates`), evitando erros de corrida. Se a `RTCPeerConnection`
-  cair (`disconnected`/`failed`), o app tenta um **ICE restart** automático
-  depois de alguns segundos. Se a conexão do Socket.io cair, o cliente
-  reconecta sozinho e reanuncia a sala.
-- **Context Isolation:** `contextIsolation: true`, `nodeIntegration: false`
-  e `sandbox: true` em `main.js`. Tudo que o renderer usa (IPC de
-  compartilhamento de tela, permissões de mídia, e até o `socket.io-client`,
-  que precisa de `require`) é exposto de forma explícita e mínima via
-  `contextBridge` em `preload.js` — o renderer nunca vê `require` ou
-  `ipcRenderer` crus.
-- **`desktopCapturer` no Main process:** `main.js` chama
-  `desktopCapturer.getSources()` (API que não existe mais no renderer desde
-  o Electron 20) e converte os thumbnails para `dataURL` antes de mandar
-  pro renderer via `ipcMain.handle('get-screen-sources')`.
-- **Troca de track na hora de compartilhar tela:** em `renderer.js`,
-  `startScreenShare()` pega a stream da tela escolhida e chama
-  `sender.replaceTrack(screenTrack)` no sender de vídeo já existente da
-  `RTCPeerConnection` — **sem renegociar** offer/answer. `stopScreenShare()`
-  faz o caminho inverso, voltando pra `cameraTrack`.
+## Testes
 
-## 6. Troubleshooting
+```powershell
+cd electron-app
+npm test
 
-**A chamada nunca conecta entre as duas casas (STUN não é suficiente).**
-STUN resolve NAT tradicional, mas não redes com CGNAT ou NAT simétrico
-(comum em algumas operadoras de internet residencial no Brasil). Se depois
-de testar em ambas as redes a conexão nunca fechar, o próximo passo é
-adicionar um servidor **TURN** em `config.js` (ex: um plano gratuito da
-Twilio, Cloudflare Calls, Metered.ca, ou um `coturn` auto-hospedado) — é
-só adicionar mais uma entrada em `ICE_SERVERS` com `urls`, `username` e
-`credential`.
+cd ../signaling-server
+npm test
+```
 
-**Câmera/microfone não pedem permissão no Mac (build empacotado).**
-Já está coberto: `package.json` do Electron app define
-`NSCameraUsageDescription` / `NSMicrophoneUsageDescription` no
-`extendInfo` do `build.mac`, e `main.js` chama
-`systemPreferences.askForMediaAccess()` explicitamente no macOS.
+Os testes do aplicativo usam o Chromium incluído no Electron, vídeo gerado por canvas e dispositivos de mídia simulados, sem acessar seu microfone/câmera reais ou o servidor hospedado. Verificam decodificação de vídeo nos dois sentidos, dois canais de áudio, ganho medido em 0/50/100/200%, compartilhamento simultâneo na interface de produção, câmera, parar/reiniciar tela, sincronização de volume, janela mínima e sair/reentrar. As capturas de conferência ficam em `electron-app/tests/artifacts/`, ignoradas pelo Git.
 
-**Tela preta ao compartilhar tela.**
-Normalmente é permissão de "Gravação de Tela" do macOS (System Settings →
-Privacy & Security → Screen Recording) — precisa marcar o app manualmente
-na primeira vez e reabrir o app.
+Os testes do servidor usam uma porta local aleatória e conferem limite de participantes, validação, encaminhamento restrito à sala, colisão com identificadores internos, mensagens inválidas, saída/reentrada e limpeza de salas.
 
-**Firewall corporativo/rede muito restritiva.**
-Nesse cenário raramente nem STUN nem TURN sobre UDP resolvem; um TURN
-configurado para também aceitar TURN-over-TCP/TLS na porta 443 é o que
-mais aumenta a chance de conectar.
+Os testes simulados não substituem a conferência entre dois computadores de captura nativa de áudio, permissões do sistema, seleção física de saída e comportamento de redes/NAT diferentes.
 
-## 7. Segurança / privacidade
+## Gerar instalador
 
-O signaling server nunca vê áudio, vídeo, nem o conteúdo compartilhado —
-só troca metadados de conexão (SDP/ICE) entre os dois sockets da mesma
-sala, e descarta tudo quando os dois saem. Ainda assim, como as salas são
-identificadas só pelo nome digitado, use um nome de sala que não seja
-óbvio de adivinhar (não precisa ser senha forte, mas evite algo como
-"sala1").
+```powershell
+cd electron-app
+npm run dist:win
+# No macOS:
+npm run dist:mac
+```
+
+Os arquivos saem em `electron-app/dist/`. O módulo `electron-native-screenshare` pode precisar das ferramentas nativas de compilação da plataforma. Se ele não carregar em execução, o app continua disponível e tenta a captura de áudio do sistema. A disponibilidade desse áudio depende da plataforma, fonte e permissões.
+
+## Servidor hospedado
+
+Hospede `signaling-server/` em um serviço Node.js. Use `npm ci` para instalação e `npm start` para inicialização. O servidor lê `PORT` e opcionalmente `ALLOWED_ORIGIN`; `/health` expõe seu estado. Atualize a URL em `config.js` e distribua o mesmo aplicativo aos dois participantes.
+
+As mudanças deste remaster também incluem validação no servidor. Atualize o servidor hospedado junto com os clientes; o novo evento `video-state` mantém a interface coerente ao desligar a câmera ou parar a tela.
+
+## Rede e privacidade
+
+O servidor de sinalização recebe metadados de conexão e códigos de sala, não áudio ou vídeo. A mídia é protegida pelo WebRTC e segue diretamente entre os participantes, ou por TURN quando configurado. Os códigos identificam salas, mas não são um sistema de contas/autenticação: compartilhe-os apenas com a pessoa convidada.
+
+STUN pode ser insuficiente em redes com CGNAT, NAT simétrico ou firewall restritivo. Nesses casos, adicione um TURN válido a `ICE_SERVERS` em `config.js`, com suas credenciais. O projeto não fornece um TURN próprio.
+
+No macOS, autorize câmera, microfone e gravação de tela nas configurações do sistema. O preload usa `socket.io-client` via Node, portanto o sandbox da janela está desativado; `contextIsolation` continua ligado, `nodeIntegration` desligado, navegação externa e novas janelas bloqueadas.
