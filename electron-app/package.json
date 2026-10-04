@@ -7,6 +7,7 @@
   "private": true,
   "author": "lurrlin",
   "scripts": {
+    "test": "electron tests/run.cjs",
     "start": "electron .",
     "dist": "electron-builder",
     "dist:win": "electron-builder --win",

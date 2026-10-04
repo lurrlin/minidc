@@ -74,9 +74,9 @@
   let nativeAudioNode = null;
   let nativeAudioDestination = null;
   let nativeAudioCleanup = null;
-  let remoteVolumeContext = null;
-  let remoteVolumeGain = null;
-  let remoteVolumeSource = null;
+  let remoteMixer = null;
+  const speakingIndicators = new Map();
+  let joining = false;
   let pc = null;
   let currentRoom = null;
   let isInitiator = false;
@@ -84,11 +84,9 @@
   let pendingCandidates = [];
   let pendingSignals = [];
   let pendingPeerJoined = false;
-  let hasAnnouncedReady = false;
   let remotePeerReady = false;
   let processingSignals = false;
   let videoTransceiver = null;
-  let offerRetryTimer = null;
   let iceFailureTimer = null;
   let renegotiationQueued = false;
   let renegotiationInProgress = false;
@@ -121,17 +119,20 @@
     toastTimer = setTimeout(() => { toastEl.hidden = true; }, duration);
   }
 
-  function ensureRemoteVolumeGain() {
-    if (remoteVolumeGain) return;
+  function ensureRemoteMixer() {
+    if (!remoteMixer) remoteMixer = new window.CallMedia.RemoteAudioMixer(remoteAudio);
+    return remoteMixer;
+  }
+
+  async function applyRemoteVolume() {
+    const value = remoteVolume.value;
+    settingsOutputVolume.value = value;
+    for (const output of [remoteVolumeValue, settingsOutputValue]) output.textContent = value + '%';
     try {
-      remoteVolumeContext = new AudioContext();
-      remoteVolumeSource = remoteVolumeContext.createMediaElementSource(remoteAudio);
-      remoteVolumeGain = remoteVolumeContext.createGain();
-      remoteVolumeSource.connect(remoteVolumeGain);
-      remoteVolumeGain.connect(remoteVolumeContext.destination);
-    } catch (err) {
-      console.warn('Controle de ganho ampliado indisponivel:', err);
-      remoteVolumeGain = null;
+      await ensureRemoteMixer().setVolume(value);
+    } catch (error) {
+      console.warn('Falha ao iniciar a saída de áudio:', error);
+      showToast('Não foi possível iniciar o áudio. Tente ajustar o volume novamente.', 'error');
     }
   }
 
@@ -163,6 +164,11 @@
     joinButton.disabled = false;
     setLobbyStatus('');
     resetLobbyMode();
+  }
+
+  function setJoining(value) {
+    joining = value;
+    for (const button of [joinButton, createRoomButton, showJoinButton]) button.disabled = value;
   }
 
   function resetLobbyMode() {
@@ -202,6 +208,7 @@
   // (Web Audio API - AnalyserNode - e a unica animacao com proposito do app)
   // ---------------------------------------------------------------------
   function attachSpeakingIndicator(stream, tileEl) {
+    speakingIndicators.get(tileEl)?.();
     try {
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const source = audioCtx.createMediaStreamSource(stream);
@@ -213,11 +220,18 @@
       const data = new Uint8Array(analyser.frequencyBinCount);
       const SPEAKING_THRESHOLD = 14; // ajuste fino se estiver sensivel demais/de menos
 
+      let frame;
+      speakingIndicators.set(tileEl, () => {
+        cancelAnimationFrame(frame);
+        source.disconnect();
+        audioCtx.close().catch(() => {});
+        tileEl.classList.remove('is-speaking');
+      });
       function tick() {
         analyser.getByteFrequencyData(data);
         const avg = data.reduce((sum, v) => sum + v, 0) / data.length;
         tileEl.classList.toggle('is-speaking', avg > SPEAKING_THRESHOLD);
-        requestAnimationFrame(tick);
+        frame = requestAnimationFrame(tick);
       }
       tick();
     } catch (err) {
@@ -274,18 +288,21 @@
   async function changeMicrophone() {
     if (!localStream || !settingsMicrophone.value) return;
     try {
-      await stopMicrophoneVolume();
       const nextStream = await navigator.mediaDevices.getUserMedia({
         audio: getMicrophoneConstraints(settingsMicrophone.value),
         video: false,
       });
       const nextTrack = nextStream.getAudioTracks()[0];
+      await stopMicrophoneVolume();
       const currentTrack = localStream.getAudioTracks()[0];
+      nextTrack.enabled = currentTrack?.enabled ?? true;
       if (microphoneSender) await microphoneSender.replaceTrack(nextTrack);
       localStream.removeTrack(currentTrack);
       currentTrack?.stop();
       localStream.addTrack(nextTrack);
       selectedMicrophoneId = settingsMicrophone.value;
+      attachSpeakingIndicator(localStream, localTile);
+      await applyMicrophoneVolume();
       showToast('Microfone alterado.', 'info', 2500);
     } catch (err) {
       showToast('Nao foi possivel trocar o microfone.', 'error');
@@ -311,7 +328,7 @@
       const sourceTrack = localStream?.getAudioTracks()[0];
       if (sourceTrack) await microphoneSender.replaceTrack(sourceTrack);
     }
-    microphoneGainContext?.close();
+    await microphoneGainContext?.close();
     microphoneGainContext = null;
     microphoneGainNode = null;
     microphoneGainDestination = null;
@@ -328,8 +345,8 @@
       microphoneGainDestination = microphoneGainContext.createMediaStreamDestination();
       source.connect(microphoneGainNode);
       microphoneGainNode.connect(microphoneGainDestination);
-      await microphoneSender.replaceTrack(microphoneGainDestination.stream.getAudioTracks()[0]);
     }
+    await microphoneSender.replaceTrack(microphoneGainDestination.stream.getAudioTracks()[0]);
     microphoneGainNode.gain.value = Number(settingsInputVolume.value) / 100;
     await microphoneGainContext.resume();
   }
@@ -362,9 +379,12 @@
   }
 
   async function enableCamera() {
+    if (!localStream || !videoTransceiver) return;
     if (cameraTrack) {
       cameraTrack.enabled = !cameraTrack.enabled;
-      btnCamera.setAttribute('aria-pressed', String(!cameraTrack.enabled));
+      btnCamera.setAttribute('aria-pressed', String(cameraTrack.enabled));
+      localTile.classList.toggle('has-video', Boolean(screenStream || cameraTrack.enabled));
+      updateTileLayout();
       return;
     }
 
@@ -374,8 +394,10 @@
       });
       cameraTrack = cameraStream.getVideoTracks()[0];
       localStream.addTrack(cameraTrack);
-      videoTransceiver.sender.replaceTrack(cameraTrack);
-      localVideo.srcObject = localStream;
+      if (!screenStream) {
+        await videoTransceiver.sender.replaceTrack(cameraTrack);
+        localVideo.srcObject = localStream;
+      }
       localTile.classList.add('has-video', 'video-square');
       updateTileLayout();
       btnCamera.setAttribute('aria-pressed', 'true');
@@ -503,22 +525,33 @@
 
     window.electronAPI.socketOn('connect_error', (err) => {
       setLobbyStatus('Nao foi possivel conectar ao servidor.', 'error');
-      joinButton.disabled = false;
+      if (!hasJoinedOnce) {
+        roomCheckResolver?.({ exists: false, available: false, error: true });
+        window.electronAPI.socketDisconnect();
+        currentRoom = null;
+        setJoining(false);
+      }
       showToast(`Erro de conexao: ${err?.message || 'verifique sua internet.'}`, 'error', 6000);
     });
 
     window.electronAPI.socketOn('join-error', (message) => {
       setLobbyStatus(message, 'error');
-      joinButton.disabled = false;
+      window.electronAPI.socketDisconnect();
+      currentRoom = null;
+      setJoining(false);
     });
 
     window.electronAPI.socketOn('room-full', () => {
       setLobbyStatus('Essa sala ja tem 2 pessoas.', 'error');
-      joinButton.disabled = false;
+      setJoining(false);
       window.electronAPI.socketDisconnect();
     });
 
     window.electronAPI.socketOn('joined-room', async ({ roomName, isFirstPeer }) => {
+      if (hasJoinedOnce && pc) {
+        pc.close();
+        pc = null;
+      }
       currentRoom = roomName;
       isInitiator = isFirstPeer;
       hasJoinedOnce = true;
@@ -529,13 +562,14 @@
         // (o pc so e recriado se realmente caiu, ver onconnectionstatechange).
         goToCallScreen(roomName);
         try {
-          await startLocalMedia();
+          if (!localStream) await startLocalMedia();
         } catch (err) {
           showToast('Nao foi possivel acessar camera/microfone. Verifique as permissoes.', 'error', 6000);
           console.error(err);
+          leaveCall();
           return;
         }
-        createPeerConnection();
+        await createPeerConnection();
         await drainSignals();
 
         if (pendingPeerJoined && isInitiator) {
@@ -543,10 +577,7 @@
           await createOffer();
         }
 
-        if (!hasAnnouncedReady) {
-          hasAnnouncedReady = true;
-          sendSignal({ type: 'ready' });
-        }
+        sendSignal({ type: 'ready' });
 
       }
 
@@ -563,10 +594,9 @@
     });
 
     async function createOffer() {
-      if (!pc) return;
+      if (!pc || !isInitiator || !remotePeerReady) return;
       if (pc.signalingState !== 'stable') return;
       try {
-        clearTimeout(offerRetryTimer);
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         sendSignal({ type: 'offer', sdp: serializeDescription(pc.localDescription) });
@@ -598,15 +628,23 @@
       try {
         if (data.type === 'offer') {
           await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+          await bindLocalChannels();
+          await applyMicrophoneVolume();
           await flushPendingCandidates();
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           sendSignal({ type: 'answer', sdp: serializeDescription(pc.localDescription) });
         } else if (data.type === 'answer') {
+          if (pc.signalingState !== 'have-local-offer') return;
           await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
           await flushPendingCandidates();
-        } else if (data.type === 'ready' && isInitiator) {
-          await createOffer();
+          if (renegotiationQueued) {
+            renegotiationQueued = false;
+            await renegotiateConnection();
+          }
+        } else if (data.type === 'ready') {
+          remotePeerReady = true;
+          if (isInitiator) await createOffer();
         } else if (data.type === 'candidate' && data.candidate) {
           if (pc.remoteDescription && pc.remoteDescription.type) {
             await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
@@ -626,11 +664,18 @@
       }
     }
 
-    window.electronAPI.socketOn('peer-left', () => {
+    window.electronAPI.socketOn('peer-left', async () => {
       showToast('A outra pessoa saiu da sala.', 'info');
       remoteVideo.srcObject = null;
       remoteVideo.dataset.empty = 'true';
-      remoteTile.classList.remove('is-speaking');
+      remoteTile.classList.remove('is-speaking', 'has-video', 'screen-share');
+      speakingIndicators.get(remoteTile)?.();
+      await remoteMixer?.close();
+      remoteMixer = null;
+      isInitiator = true;
+      remotePeerReady = false;
+      pendingSignals = [];
+      updateTileLayout();
       setConnectionState('connecting');
       callStatus.textContent = 'esperando a outra pessoa voltar...';
       // Mantemos nossa PeerConnection e midia local de pe: quando ela
@@ -639,7 +684,7 @@
       if (pc) {
         pc.close();
         pc = null;
-        createPeerConnection();
+        await createPeerConnection();
       }
     });
   }
@@ -658,21 +703,35 @@
   // ---------------------------------------------------------------------
   // RTCPeerConnection
   // ---------------------------------------------------------------------
-  function createPeerConnection() {
+  async function bindLocalChannels() {
+    const channels = await window.CallMedia.bindMediaChannels(pc, {
+      microphone: microphoneGainDestination?.stream.getAudioTracks()[0] || localStream.getAudioTracks()[0],
+      video: screenStream?.getVideoTracks()[0] || cameraTrack,
+      screenAudio: screenAudioTrack,
+    });
+    microphoneSender = channels.microphoneSender;
+    videoTransceiver = channels.videoTransceiver;
+    screenAudioTransceiver = channels.screenAudioTransceiver;
+  }
+
+  async function createPeerConnection() {
+    clearTimeout(reconnectTimer);
+    clearTimeout(iceFailureTimer);
+    pendingCandidates = [];
+    videoTransceiver = null;
+    screenAudioTransceiver = null;
+    microphoneSender = null;
     pc = new RTCPeerConnection({
       iceServers: CONFIG.ICE_SERVERS,
       iceCandidatePoolSize: 10,
     });
 
-    // Reanexa as tracks locais atuais (camera ligada/desligada, tela
-    // compartilhada ou nao) a nova conexao.
-    localStream.getTracks().forEach((track) => {
-      const sender = pc.addTrack(track, localStream);
-      if (track.kind === 'audio') microphoneSender = sender;
-    });
-    videoTransceiver = pc.getTransceivers().find((transceiver) => transceiver.sender.track?.kind === 'video');
-    if (!videoTransceiver) videoTransceiver = pc.addTransceiver('video', { direction: 'sendrecv' });
-    screenAudioTransceiver = pc.addTransceiver('audio', { direction: 'sendrecv' });
+    // The answerer binds the offered channels after setRemoteDescription.
+    // Empty channels created on both sides leave orphaned recvonly senders.
+    if (isInitiator) await bindLocalChannels();
+    if (isInitiator) await applyMicrophoneVolume();
+
+    const connection = pc;
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
@@ -688,22 +747,22 @@
         updateTileLayout();
         remoteVideo.play().catch(() => {});
       } else if (event.track.kind === 'audio') {
-        const audioTracks = remoteAudio.srcObject?.getAudioTracks() || [];
-        remoteAudio.srcObject = new MediaStream([...audioTracks, event.track]);
-        remoteAudio.play().catch(() => {});
-        attachSpeakingIndicator(remoteAudio.srcObject, remoteTile);
+        const mixer = ensureRemoteMixer();
+        mixer.addTrack(event.track);
+        mixer.setVolume(remoteVolume.value).catch(console.warn);
+        attachSpeakingIndicator(mixer.destination.stream, remoteTile);
       }
     };
 
     pc.onconnectionstatechange = () => {
-      if (!pc) return;
+      if (pc !== connection) return;
       console.log('[pc] connectionState:', pc.connectionState);
 
       if (pc.connectionState === 'connected') {
         clearTimeout(reconnectTimer);
-        clearTimeout(offerRetryTimer);
         clearTimeout(iceFailureTimer);
         setConnectionState('connected');
+        if (screenStream) sendSignal({ type: 'screen-share-start' });
       } else if (pc.connectionState === 'disconnected') {
         setConnectionState('lost');
         // Rede "piscou" - da um tempo pra reconectar sozinho antes de
@@ -717,7 +776,7 @@
     };
 
     pc.oniceconnectionstatechange = () => {
-      if (!pc) return;
+      if (pc !== connection) return;
       if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
         clearTimeout(iceFailureTimer);
       } else if (pc.iceConnectionState === 'failed') {
@@ -742,7 +801,7 @@
     try {
       const offer = await pc.createOffer({ iceRestart: true });
       await pc.setLocalDescription(offer);
-      sendSignal({ type: 'offer', sdp: pc.localDescription });
+      sendSignal({ type: 'offer', sdp: serializeDescription(pc.localDescription) });
     } catch (err) {
       console.error('Erro no ICE restart:', err);
     }
@@ -776,24 +835,8 @@
   });
   navigator.mediaDevices.addEventListener('devicechange', refreshMicrophones);
 
-  remoteAudio.volume = 1;
-  remoteVolume.addEventListener('input', () => {
-    ensureRemoteVolumeGain();
-    const volume = Number(remoteVolume.value) / 100;
-    remoteAudio.volume = 1;
-    remoteVideo.volume = 1;
-    if (remoteVolumeGain) {
-      remoteVolumeGain.gain.value = volume;
-      remoteVolumeContext.resume().catch(() => {});
-    } else {
-      remoteAudio.volume = Math.min(volume, 1);
-    }
-    remoteVolumeValue.value = `${remoteVolume.value}%`;
-    remoteVolumeValue.textContent = `${remoteVolume.value}%`;
-    settingsOutputVolume.value = remoteVolume.value;
-    settingsOutputValue.value = `${remoteVolume.value}%`;
-    settingsOutputValue.textContent = `${remoteVolume.value}%`;
-  });
+  remoteVideo.muted = true;
+  remoteVolume.addEventListener('input', applyRemoteVolume);
 
   settingsOutputVolume.addEventListener('input', () => {
     remoteVolume.value = settingsOutputVolume.value;
@@ -801,7 +844,7 @@
   });
 
   function toggleVideoSize(tile, event) {
-    if (event.target.closest('button')) return;
+    if (event.target.closest('button, input, label, select, .context-menu, .volume-panel')) return;
     tile.classList.toggle('video-expanded');
     tile.classList.toggle('video-square');
   }
@@ -825,16 +868,16 @@
   remoteTile.addEventListener('contextmenu', (event) => {
     event.preventDefault();
     remoteContextMenu.hidden = false;
-    remoteContextMenu.style.left = `${event.offsetX}px`;
-    remoteContextMenu.style.top = `${event.offsetY}px`;
+    const bounds = remoteTile.getBoundingClientRect();
+    remoteContextMenu.style.left = `${Math.max(8, Math.min(event.clientX - bounds.left, bounds.width - remoteContextMenu.offsetWidth - 8))}px`;
+    remoteContextMenu.style.top = `${Math.max(8, Math.min(event.clientY - bounds.top, bounds.height - remoteContextMenu.offsetHeight - 8))}px`;
   });
   remoteContextMenu.addEventListener('click', (event) => event.stopPropagation());
 
   btnRemoteMute.addEventListener('click', (event) => {
     event.stopPropagation();
-    remoteVideo.muted = !remoteVideo.muted;
-    remoteAudio.muted = remoteVideo.muted;
-    btnRemoteMute.textContent = remoteVideo.muted ? 'Desmutar live' : 'Mutar live';
+    remoteAudio.muted = !remoteAudio.muted;
+    btnRemoteMute.textContent = remoteAudio.muted ? 'Desmutar live' : 'Mutar live';
     closeRemoteContextMenu();
   });
 
@@ -892,7 +935,11 @@
     if (e.target === sourceModal) closeSourcePicker();
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !sourceModal.hidden) closeSourcePicker();
+    if (e.key === 'Escape') {
+      closeSourcePicker();
+      settingsModal.hidden = true;
+      closeRemoteContextMenu();
+    }
   });
 
   async function startScreenShare(sourceId, includeAudio = false, nativeAudioPid = null) {
@@ -991,23 +1038,30 @@
     screenAudioTrack = null;
 
     const sender = pc && (videoTransceiver?.sender || pc.getSenders().find((s) => s.track?.kind === 'video'));
-    if (sender && cameraTrack) await sender.replaceTrack(cameraTrack);
+    if (sender) await sender.replaceTrack(cameraTrack || null);
 
     localVideo.srcObject = localStream;
     localTile.classList.remove('screen-share');
-    localTile.classList.toggle('has-video', Boolean(cameraTrack));
+    localTile.classList.toggle('has-video', Boolean(cameraTrack?.enabled));
     updateTileLayout();
-    localTileLabel.textContent = 'user';
+    localTileLabel.textContent = 'Você';
     btnShare.setAttribute('aria-pressed', 'false');
     sendSignal({ type: 'screen-share-stop' });
   }
 
   function leaveCall() {
+    setJoining(false);
+    roomCheckResolver?.({ error: true });
+    roomCheckResolver = null;
     window.electronAPI.socketEmit('leave-room');
     window.electronAPI.socketDisconnect();
 
     if (screenStream) screenStream.getTracks().forEach((t) => t.stop());
     if (localStream) localStream.getTracks().forEach((t) => t.stop());
+    remoteMixer?.close().catch(() => {});
+    remoteMixer = null;
+    speakingIndicators.forEach((cleanup) => cleanup());
+    speakingIndicators.clear();
     stopNativeAudioCapture().catch(() => {});
     stopMicrophoneVolume().catch(() => {});
     if (pc) pc.close();
@@ -1025,7 +1079,9 @@
     remotePeerReady = false;
     processingSignals = false;
     videoTransceiver = null;
-    clearTimeout(offerRetryTimer);
+    screenAudioTransceiver = null;
+    screenAudioTrack = null;
+    clearTimeout(reconnectTimer);
     clearTimeout(iceFailureTimer);
     renegotiationQueued = false;
     renegotiationInProgress = false;
@@ -1036,8 +1092,16 @@
     btnMute.setAttribute('aria-pressed', 'false');
     btnCamera.setAttribute('aria-pressed', 'false');
     btnShare.setAttribute('aria-pressed', 'false');
-    localTile.classList.remove('screen-share');
-    localTileLabel.textContent = 'user';
+    localTile.classList.remove('screen-share', 'has-video', 'video-expanded');
+    localTile.classList.add('video-square');
+    remoteTile.classList.remove('video-expanded');
+    remoteTile.classList.add('video-square');
+    remoteAudio.muted = false;
+    btnRemoteMute.textContent = 'Silenciar áudio';
+    closeRemoteContextMenu();
+    settingsModal.hidden = true;
+    closeSourcePicker();
+    localTileLabel.textContent = 'Você';
     remoteTile.classList.remove('screen-share');
     remoteTile.classList.remove('has-video');
     updateTileLayout();
@@ -1049,9 +1113,8 @@
   // Lobby: entrar na sala
   // ---------------------------------------------------------------------
   async function beginJoin(roomName, verifyRoom = false) {
-    if (!roomName) return;
-
-    joinButton.disabled = true;
+    if (!roomName || joining) return;
+    setJoining(true);
     setLobbyStatus('Conectando ao servidor...', 'info');
 
     // IMPORTANTE: socketConnect() precisa vir antes de wireSocketEvents(),
@@ -1062,20 +1125,27 @@
     wireSocketEvents();
     if (verifyRoom) {
       const roomResult = await new Promise((resolve) => {
-        roomCheckResolver = resolve;
+        const timer = setTimeout(() => {
+          roomCheckResolver = null;
+          resolve({ error: true });
+        }, 15000);
+        roomCheckResolver = (result) => {
+          clearTimeout(timer);
+          resolve(result);
+        };
         window.electronAPI.socketEmit('check-room', roomName);
       });
-      if (!roomResult.exists) {
+      if (roomResult.error || !roomResult.exists) {
         window.electronAPI.socketDisconnect();
         currentRoom = null;
-        joinButton.disabled = false;
-        setLobbyStatus('Essa sala nao existe.', 'error');
+        setJoining(false);
+        setLobbyStatus(roomResult.error ? 'O servidor não respondeu. Tente novamente.' : 'Essa sala não existe.', 'error');
         return;
       }
       if (!roomResult.available) {
         window.electronAPI.socketDisconnect();
         currentRoom = null;
-        joinButton.disabled = false;
+        setJoining(false);
         setLobbyStatus('Essa sala ja esta cheia.', 'error');
         return;
       }
