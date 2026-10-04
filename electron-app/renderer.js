@@ -1001,6 +1001,7 @@
     remoteAudio.muted = deafened;
     remoteMixer?.setDeafened(deafened);
     updateDeafenButton();
+    if (!deafened) applyRemoteVolume();
   });
 
   function toggleVideoSize(tile, event) {

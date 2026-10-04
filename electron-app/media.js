@@ -34,6 +34,7 @@
       this.destination = this.context.createMediaStreamDestination();
       this.gain.connect(this.destination);
       this.sources = new Map();
+      this.inputs = new Map();
       element.srcObject = this.destination.stream;
       element.volume = 1;
     }
@@ -42,12 +43,23 @@
       if (this.sources.has(track.id)) return;
       if (!this.channelGains[channel]) throw new Error('Canal de áudio inválido.');
       // A MediaStreamSource reads only one audio track: mix each track explicitly.
-      const source = this.context.createMediaStreamSource(new MediaStream([track]));
+      const stream = new MediaStream([track]);
+      // Chromium needs a playing media element to pull received WebRTC audio.
+      // Keep the raw track silent; the mixer remains the only audible output.
+      const input = document.createElement('audio');
+      input.autoplay = true;
+      input.muted = true;
+      input.srcObject = stream;
+      this.inputs.set(track.id, input);
+      const source = this.context.createMediaStreamSource(stream);
       source.connect(this.channelGains[channel]);
       this.sources.set(track.id, source);
       track.addEventListener('ended', () => {
         source.disconnect();
         this.sources.delete(track.id);
+        input.pause();
+        input.srcObject = null;
+        this.inputs.delete(track.id);
       }, { once: true });
     }
 
@@ -55,6 +67,7 @@
       this.volume = Math.max(0, Math.min(200, Number(percent)));
       this.gain.gain.value = this.deafened ? 0 : this.volume / 100;
       await this.context.resume();
+      await Promise.all([...this.inputs.values()].map((input) => input.play()));
       await this.element.play();
     }
 
@@ -72,6 +85,8 @@
     close() {
       this.sources.forEach((source) => source.disconnect());
       this.sources.clear();
+      this.inputs.forEach((input) => { input.pause(); input.srcObject = null; });
+      this.inputs.clear();
       Object.values(this.channelGains).forEach((gain) => gain.disconnect());
       this.gain.disconnect();
       this.element.srcObject = null;

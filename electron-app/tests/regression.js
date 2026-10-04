@@ -15,6 +15,21 @@
   async function testPair() {
     const first = new RTCPeerConnection({ iceServers: [] });
     const second = new RTCPeerConnection({ iceServers: [] });
+    const receivedMixers = [first, second].map((peer) => {
+      const element = document.createElement('audio');
+      document.body.append(element);
+      const mixer = new CallMedia.RemoteAudioMixer(element);
+      const analyser = mixer.context.createAnalyser();
+      mixer.gain.connect(analyser);
+      peer.ontrack = ({ track, transceiver }) => {
+        if (track.kind === 'audio') {
+          const audioChannels = peer.getTransceivers().filter((channel) => channel.receiver.track.kind === 'audio');
+          mixer.addTrack(track, transceiver === audioChannels[0] ? 'voice' : 'screen');
+          mixer.setVolume(100);
+        }
+      };
+      return { mixer, analyser, element };
+    });
     const queued = [[], []];
     first.onicecandidate = ({ candidate }) => { if (candidate) queued[1].push(candidate); };
     second.onicecandidate = ({ candidate }) => { if (candidate) queued[0].push(candidate); };
@@ -48,6 +63,24 @@
         const stats = [...(await peer.getStats()).values()];
         assert(stats.some((s) => s.type === 'inbound-rtp' && s.kind === 'video' && s.framesDecoded > 0), `P${index + 1} receives and decodes the other peer's screen`);
         assert(stats.filter((s) => s.type === 'inbound-rtp' && s.kind === 'audio' && s.bytesReceived > 0).length === 2, `P${index + 1} receives microphone and shared audio`);
+        const samples = new Float32Array(2048);
+        receivedMixers[index].analyser.getFloatTimeDomainData(samples);
+        assert(samples.some((sample) => Math.abs(sample) > 0.001), `P${index + 1} renders received WebRTC audio through the production mixer`);
+        const { mixer, analyser } = receivedMixers[index];
+        mixer.setDeafened(true);
+        await wait(200);
+        analyser.getFloatTimeDomainData(samples);
+        assert(samples.every((sample) => Math.abs(sample) < 0.00001), `P${index + 1} deafen silences received WebRTC audio`);
+        mixer.setDeafened(false);
+        mixer.setChannelVolume('screen', 0);
+        await wait(200);
+        analyser.getFloatTimeDomainData(samples);
+        assert(samples.some((sample) => Math.abs(sample) > 0.001), `P${index + 1} undeafen restores the received voice with transmission muted`);
+        mixer.setChannelVolume('voice', 0);
+        mixer.setChannelVolume('screen', 100);
+        await wait(200);
+        analyser.getFloatTimeDomainData(samples);
+        assert(samples.some((sample) => Math.abs(sample) > 0.001), `P${index + 1} transmission remains audible with received voice muted`);
       }
       await channelsB.videoTransceiver.sender.replaceTrack(null);
       await channelsB.videoTransceiver.sender.replaceTrack(streams[1].getVideoTracks()[0]);
@@ -56,6 +89,7 @@
       clearInterval(paint);
       streams.forEach((stream) => stream.getTracks().forEach((track) => track.stop()));
       first.close(); second.close();
+      for (const { mixer, element } of receivedMixers) { await mixer.close(); element.remove(); }
     }
   }
 
@@ -122,6 +156,8 @@
     'Undeafen restores the master volume and preserves independent channel levels');
   assert(await rms(100) > 0.001, 'Audio resumes after undeafening');
   await mixer.close();
+  assert(mixer.inputs.size === 0 && mixer.sources.size === 0 && audio.srcObject === null,
+    'Teardown releases the silent playback elements and mixer output');
   oscillator.stop();
   secondOscillator.stop();
   await context.close();
