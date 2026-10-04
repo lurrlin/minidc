@@ -38,6 +38,13 @@ function roomSize(roomName) {
   return rooms.get(roomName)?.size ?? 0;
 }
 
+function validRoomName(value) {
+  return typeof value === 'string' && value.trim().length > 0 && value.trim().length <= 40;
+}
+
+const roomKey = (name) => `call:${name}`;
+const signalTypes = new Set(['offer', 'answer', 'candidate', 'ready', 'screen-share-start', 'screen-share-stop', 'video-state', 'renegotiate']);
+
 app.get('/', (_req, res) => {
   res.send('Mini Discord signaling server - online.');
 });
@@ -56,11 +63,11 @@ io.on('connection', (socket) => {
   let currentRoom = null;
 
   socket.on('join-room', (roomNameRaw) => {
-    const roomName = String(roomNameRaw || '').trim();
-    if (!roomName) {
+    if (!validRoomName(roomNameRaw)) {
       socket.emit('join-error', 'Nome de sala invalido.');
       return;
     }
+    const roomName = roomNameRaw.trim();
 
     // Um socket so pode estar em uma sala por vez neste app.
     if (currentRoom) {
@@ -73,7 +80,7 @@ io.on('connection', (socket) => {
       return;
     }
 
-    socket.join(roomName);
+    socket.join(roomKey(roomName));
     currentRoom = roomName;
     if (!rooms.has(roomName)) rooms.set(roomName, new Set());
     rooms.get(roomName).add(socket.id);
@@ -87,12 +94,12 @@ io.on('connection', (socket) => {
     // Convencao: quem JA ESTAVA na sala cria a offer (evita "glare",
     // ou seja, os dois tentando ofertar ao mesmo tempo).
     if (size === 2) {
-      socket.to(roomName).emit('peer-joined');
+      socket.to(roomKey(roomName)).emit('peer-joined');
     }
   });
 
   socket.on('check-room', (roomNameRaw) => {
-    const roomName = String(roomNameRaw || '').trim();
+    const roomName = validRoomName(roomNameRaw) ? roomNameRaw.trim() : '';
     const size = roomSize(roomName);
     socket.emit('room-check-result', {
       roomName,
@@ -104,9 +111,12 @@ io.on('connection', (socket) => {
   // Repassa qualquer mensagem de sinalizacao (offer, answer ou ICE candidate)
   // para o outro peer da mesma sala. O "shape" do payload e definido pelo
   // cliente (renderer.js); o servidor so encaminha, sem inspecionar.
-  socket.on('signal', ({ roomName, data }) => {
-    if (!roomName || roomName !== currentRoom) return;
-    socket.to(roomName).emit('signal', data);
+  socket.on('signal', (payload) => {
+    if (!payload || typeof payload !== 'object') return;
+    const { roomName, data } = payload;
+    if (!currentRoom || roomName !== currentRoom || !data || !signalTypes.has(data.type)) return;
+    if (JSON.stringify(data).length > 128 * 1024) return;
+    socket.to(roomKey(roomName)).emit('signal', data);
   });
 
   socket.on('leave-room', () => cleanup('leave-room event'));
@@ -117,15 +127,19 @@ io.on('connection', (socket) => {
     const set = rooms.get(currentRoom);
     if (set) {
       set.delete(socket.id);
-      socket.to(currentRoom).emit('peer-left');
+      socket.to(roomKey(currentRoom)).emit('peer-left');
       if (set.size === 0) rooms.delete(currentRoom);
     }
     console.log(`[leave] ${socket.id} <- "${currentRoom}" (${reason})`);
-    socket.leave(currentRoom);
+    socket.leave(roomKey(currentRoom));
     currentRoom = null;
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`Signaling server ouvindo na porta ${PORT}`);
-});
+if (require.main === module) {
+  server.listen(PORT, () => {
+    console.log(`Signaling server ouvindo na porta ${PORT}`);
+  });
+}
+
+module.exports = { server, io };
