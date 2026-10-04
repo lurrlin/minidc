@@ -34,6 +34,7 @@
       "output": "dist"
     },
     "mac": {
+      "icon": "assets/unme.png",
       "category": "public.app-category.social-networking",
       "target": [
         "dmg"
@@ -45,12 +46,16 @@
       }
     },
     "win": {
+      "icon": "assets/unme.ico",
       "publisherName": "lurrlin",
       "target": [
         "nsis"
       ]
     },
     "nsis": {
+      "installerIcon": "assets/unme.ico",
+      "uninstallerIcon": "assets/unme.ico",
+      "installerHeaderIcon": "assets/unme.ico",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     }

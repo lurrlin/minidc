@@ -18,6 +18,7 @@ function createWindow() {
     backgroundColor: '#10121b',
     autoHideMenuBar: true,
     title: 'unme',
+    icon: path.join(__dirname, 'assets', process.platform === 'win32' ? 'unme.ico' : 'unme.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
