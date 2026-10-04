@@ -80,6 +80,17 @@ module.exports = async function testUI() {
     }
     for (let i = 0; i < 2; i++) await until(i, `document.getElementById('remote-video').videoWidth > 0 && document.getElementById('remote-video').getVideoPlaybackQuality().totalVideoFrames > 0`);
     checks.push('Production renderer displays P1 and P2 screens simultaneously');
+    await evaluate(0, `document.getElementById('btn-fullscreen').click()`);
+    await until(0, `document.fullscreenElement === document.getElementById('remote-tile')`);
+    assert(await evaluate(0, `document.getElementById('btn-fullscreen').textContent === 'Sair da tela cheia'`), 'Fullscreen button changes to an explicit exit action');
+    await evaluate(0, `document.getElementById('btn-fullscreen').click()`);
+    await until(0, `!document.fullscreenElement`);
+    checks.push('Same button exits real Chromium fullscreen');
+    await evaluate(0, `document.getElementById('btn-fullscreen').click()`);
+    await until(0, `!!document.fullscreenElement`);
+    await evaluate(0, `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+    await until(0, `!document.fullscreenElement`);
+    checks.push('Escape also exits fullscreen');
     await evaluate(1, `document.getElementById('btn-share').click()`);
     await until(1, `!document.getElementById('source-modal').hidden`);
     await evaluate(1, `document.getElementById('stop-screen-share').click()`);

@@ -902,10 +902,18 @@
   btnFullscreen.addEventListener('click', async (event) => {
     event.stopPropagation();
     try {
-      await remoteTile.requestFullscreen();
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await remoteTile.requestFullscreen();
     } catch (err) {
-      showToast('Nao foi possivel abrir tela cheia.', 'error');
+      showToast('Não foi possível alternar a tela cheia.', 'error');
     }
+  });
+
+  document.addEventListener('fullscreenchange', () => {
+    const active = document.fullscreenElement === remoteTile;
+    btnFullscreen.textContent = active ? 'Sair da tela cheia' : 'Tela cheia';
+    btnFullscreen.setAttribute('aria-label', btnFullscreen.textContent);
+    btnFullscreen.setAttribute('aria-pressed', String(active));
   });
 
   function closeRemoteContextMenu() {
@@ -983,6 +991,7 @@
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      if (document.fullscreenElement) document.exitFullscreen().catch(console.warn);
       closeSourcePicker();
       settingsModal.hidden = true;
       closeRemoteContextMenu();
@@ -1140,6 +1149,7 @@
   }
 
   function leaveCall() {
+    if (document.fullscreenElement) document.exitFullscreen().catch(console.warn);
     setJoining(false);
     roomCheckResolver?.({ error: true });
     roomCheckResolver = null;
