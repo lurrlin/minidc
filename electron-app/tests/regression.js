@@ -98,10 +98,29 @@
   secondOscillator.connect(secondLevel);
   secondLevel.connect(secondAudio);
   secondOscillator.start();
-  mixer.addTrack(secondAudio.stream.getAudioTracks()[0]);
+  mixer.addTrack(secondAudio.stream.getAudioTracks()[0], 'screen');
   assert(mixer.sources.size === 2, 'Microphone and screen audio are mixed as separate sources');
   const mixed = await rms(100);
   assert(mixed > normal * 1.2, 'Both audio tracks contribute to the output waveform');
+  mixer.setChannelVolume('screen', 0);
+  const voiceOnly = await rms(100);
+  assert(voiceOnly / normal > 0.9 && voiceOnly / normal < 1.1, 'Muting the transmission leaves the voice waveform unchanged');
+  mixer.setChannelVolume('voice', 0);
+  mixer.setChannelVolume('screen', 100);
+  const screenOnly = await rms(100);
+  assert(screenOnly / normal > 0.9 && screenOnly / normal < 1.1, 'Muting the voice leaves the transmission audible');
+  mixer.setChannelVolume('screen', 175);
+  const louderScreen = await rms(100);
+  assert(louderScreen / screenOnly > 1.6 && louderScreen / screenOnly < 1.9, 'Transmission gain amplifies its own waveform independently');
+  mixer.setChannelVolume('voice', 45);
+  mixer.setDeafened(true);
+  assert(await rms(100) < 0.00001 && audio.muted, 'Deafen produces silence for both channels');
+  assert(await rms(160) < 0.00001, 'Changing master volume while deafened cannot leak audio');
+  mixer.setDeafened(false);
+  assert(mixer.channelGains.voice.gain.value > 0.44 && mixer.channelGains.voice.gain.value < 0.46
+    && mixer.channelGains.screen.gain.value === 1.75 && mixer.gain.gain.value > 1.59 && !audio.muted,
+    'Undeafen restores the master volume and preserves independent channel levels');
+  assert(await rms(100) > 0.001, 'Audio resumes after undeafening');
   await mixer.close();
   oscillator.stop();
   secondOscillator.stop();

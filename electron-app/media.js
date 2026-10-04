@@ -24,6 +24,13 @@
       this.element = element;
       this.context = new AudioContext();
       this.gain = this.context.createGain();
+      this.channelGains = {
+        voice: this.context.createGain(),
+        screen: this.context.createGain(),
+      };
+      Object.values(this.channelGains).forEach((gain) => gain.connect(this.gain));
+      this.volume = 100;
+      this.deafened = false;
       this.destination = this.context.createMediaStreamDestination();
       this.gain.connect(this.destination);
       this.sources = new Map();
@@ -31,11 +38,12 @@
       element.volume = 1;
     }
 
-    addTrack(track) {
+    addTrack(track, channel = 'voice') {
       if (this.sources.has(track.id)) return;
+      if (!this.channelGains[channel]) throw new Error('Canal de áudio inválido.');
       // A MediaStreamSource reads only one audio track: mix each track explicitly.
       const source = this.context.createMediaStreamSource(new MediaStream([track]));
-      source.connect(this.gain);
+      source.connect(this.channelGains[channel]);
       this.sources.set(track.id, source);
       track.addEventListener('ended', () => {
         source.disconnect();
@@ -44,14 +52,28 @@
     }
 
     async setVolume(percent) {
-      this.gain.gain.value = Math.max(0, Math.min(200, Number(percent))) / 100;
+      this.volume = Math.max(0, Math.min(200, Number(percent)));
+      this.gain.gain.value = this.deafened ? 0 : this.volume / 100;
       await this.context.resume();
       await this.element.play();
+    }
+
+    setChannelVolume(channel, percent) {
+      if (!this.channelGains[channel]) throw new Error('Canal de áudio inválido.');
+      this.channelGains[channel].gain.value = Math.max(0, Math.min(200, Number(percent))) / 100;
+    }
+
+    setDeafened(value) {
+      this.deafened = Boolean(value);
+      this.element.muted = this.deafened;
+      this.gain.gain.value = this.deafened ? 0 : this.volume / 100;
     }
 
     close() {
       this.sources.forEach((source) => source.disconnect());
       this.sources.clear();
+      Object.values(this.channelGains).forEach((gain) => gain.disconnect());
+      this.gain.disconnect();
       this.element.srcObject = null;
       return this.context.close();
     }
