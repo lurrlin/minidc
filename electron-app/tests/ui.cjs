@@ -69,6 +69,12 @@ module.exports = async function testUI() {
       window.APP_CONFIG.ICE_SERVERS = [];
       window.__microphoneCaptures = [];
       window.__outgoingMicrophoneTracks = [];
+      window.__remoteMixers = [];
+      const OriginalMixer = CallMedia.RemoteAudioMixer;
+      CallMedia.RemoteAudioMixer = class extends OriginalMixer {
+        constructor(element) { super(element); this.assignments = []; window.__remoteMixers.push(this); }
+        addTrack(track, channel) { super.addTrack(track, channel); this.assignments.push(channel); }
+      };
       const originalReplaceTrack = RTCRtpSender.prototype.replaceTrack;
       RTCRtpSender.prototype.replaceTrack = async function(track) {
         await originalReplaceTrack.call(this, track);
@@ -101,13 +107,20 @@ module.exports = async function testUI() {
     `);
     await evaluate(0, `document.getElementById('create-room-button').click()`);
     await until(0, `!document.getElementById('call-screen').hidden`);
+    assert(await evaluate(0, `(() => { const stage = document.querySelector('.stage').getBoundingClientRect(); const remote = document.getElementById('remote-tile').getBoundingClientRect(); const local = document.getElementById('local-tile').getBoundingClientRect(); window.__emptyTileSize = { width: remote.width, height: remote.height }; return remote.height > stage.height * .8 && remote.width > stage.width * .4 && Math.abs(local.height - remote.height) < 1; })()`), 'Empty tiles fill the same call stage as video tiles');
+    await evaluate(0, `document.getElementById('btn-deafen').click()`);
     const room = await evaluate(0, `document.getElementById('active-room-code').textContent`);
     await evaluate(1, `document.getElementById('show-join-button').click(); document.getElementById('room-input').value = ${JSON.stringify(room)}; document.getElementById('join-form').requestSubmit();`);
     for (let i = 0; i < 2; i++) await until(i, `document.getElementById('connection-dot').classList.contains('conn-connected')`);
     checks.push('Production renderer connects two peers without cameras');
+    assert(await evaluate(0, `window.__remoteMixers.at(-1).assignments.includes('voice') && window.__remoteMixers.at(-1).assignments.includes('screen')`), 'Negotiated microphone and transmission tracks reach separate mixer channels');
+    assert(await evaluate(0, `document.getElementById('remote-audio').muted && window.__remoteMixers.at(-1).gain.gain.value === 0`), 'Deafen selected before joining the partner also silences newly received tracks');
+    await evaluate(0, `document.getElementById('btn-deafen').click()`);
     await until(0, `document.getElementById('remote-tile-label').textContent === 'Bia' && !!document.querySelector('#remote-avatar img')`);
     await until(1, `document.getElementById('remote-tile-label').textContent === 'Alex' && !!document.querySelector('#remote-avatar img')`);
     checks.push('Names and photos reach both partners over a real WebRTC data channel');
+    await wait(100);
+    fs.writeFileSync(path.join(artifacts, 'audio-only.png'), (await windows[0].webContents.capturePage()).toPNG());
     assert(!profileWasSignaled, 'Profile payloads are never forwarded through the signaling server');
     assert(await evaluate(0, `!document.getElementById('remote-tile').classList.contains('has-video')`), 'Audio-only call displays an avatar instead of a black video');
     await evaluate(1, `document.getElementById('btn-camera').click()`);
@@ -123,6 +136,7 @@ module.exports = async function testUI() {
     }
     for (let i = 0; i < 2; i++) await until(i, `document.getElementById('remote-video').videoWidth > 0 && document.getElementById('remote-video').getVideoPlaybackQuality().totalVideoFrames > 0`);
     checks.push('Production renderer displays P1 and P2 screens simultaneously');
+    assert(await evaluate(0, `(() => { const bounds = document.getElementById('remote-tile').getBoundingClientRect(); return Math.abs(bounds.width - window.__emptyTileSize.width) < 1 && Math.abs(bounds.height - window.__emptyTileSize.height) < 1; })()`), 'Starting video does not change the empty tile dimensions');
     await evaluate(0, `document.getElementById('btn-fullscreen').click()`);
     await until(0, `document.fullscreenElement === document.getElementById('remote-tile')`);
     await until(0, `document.getElementById('btn-fullscreen').textContent === 'Sair da tela cheia'`);
@@ -144,13 +158,25 @@ module.exports = async function testUI() {
     await evaluate(1, `document.querySelector('.source-option').click()`);
     await until(0, `document.getElementById('remote-tile').classList.contains('has-video')`);
     checks.push('Stopping sharing restores the disabled camera and sharing can restart');
-    await evaluate(0, `document.getElementById('remote-volume').value = '200'; document.getElementById('remote-volume').dispatchEvent(new Event('input'));`);
+    assert(await evaluate(0, `document.getElementById('remote-context-menu').hidden && document.getElementById('remote-volume').getBoundingClientRect().width === 0`), 'Received audio controls are hidden until the right-click menu opens');
+    await evaluate(0, `(() => { const tile = document.getElementById('remote-tile'); const bounds = tile.getBoundingClientRect(); tile.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: bounds.right - 4, clientY: bounds.bottom - 4 })); })()`);
+    assert(await evaluate(0, `!document.getElementById('remote-context-menu').hidden && document.getElementById('screen-volume').getBoundingClientRect().width > 0`), 'Right click reveals separate voice and transmission sliders');
+    await evaluate(0, `document.getElementById('remote-volume').value = '200'; document.getElementById('remote-volume').dispatchEvent(new Event('input')); document.getElementById('screen-volume').value = '35'; document.getElementById('screen-volume').dispatchEvent(new Event('input'));`);
     await wait(100);
-    assert(await evaluate(0, `document.getElementById('settings-output-volume').value === '200' && document.getElementById('remote-volume-value').textContent === '200%'`), 'Volume controls remain synchronized');
+    assert(await evaluate(0, `document.getElementById('settings-output-volume').value === '100' && document.getElementById('remote-volume-value').textContent === '200%' && document.getElementById('screen-volume-value').textContent === '35%' && window.__remoteMixers.at(-1).channelGains.voice.gain.value === 2 && Math.abs(window.__remoteMixers.at(-1).channelGains.screen.gain.value - .35) < .001`), 'Voice and transmission levels change independently of the master slider');
     assert(await evaluate(0, `const tile = document.getElementById('remote-tile'); const before = tile.className; document.getElementById('remote-volume').click(); before === tile.className;`), 'Clicking the slider does not resize the screen');
+    await evaluate(0, `document.getElementById('btn-deafen').click()`);
+    assert(await evaluate(0, `document.getElementById('remote-audio').muted && window.__remoteMixers.at(-1).gain.gain.value === 0 && document.getElementById('btn-deafen').getAttribute('aria-pressed') === 'true' && window.__microphoneCaptures.at(-1).track.enabled`), 'Dock deafen silences both channels without muting the microphone');
+    await evaluate(0, `document.getElementById('screen-volume').value = '65'; document.getElementById('screen-volume').dispatchEvent(new Event('input'));`);
+    assert(await evaluate(0, `window.__remoteMixers.at(-1).gain.gain.value === 0`), 'Adjusting a channel while deafened keeps the output silent');
+    await evaluate(0, `document.getElementById('btn-deafen').click()`);
+    assert(await evaluate(0, `!document.getElementById('remote-audio').muted && window.__remoteMixers.at(-1).gain.gain.value === 1 && window.__remoteMixers.at(-1).channelGains.voice.gain.value === 2 && Math.abs(window.__remoteMixers.at(-1).channelGains.screen.gain.value - .65) < .001`), 'Dock undeafen restores output without resetting voice and transmission levels');
+    await evaluate(0, `(() => { const tile = document.getElementById('remote-tile'); const bounds = tile.getBoundingClientRect(); tile.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: bounds.right - 4, clientY: bounds.bottom - 4 })); })()`);
+    await wait(100);
     fs.writeFileSync(path.join(artifacts, 'call.png'), (await windows[0].webContents.capturePage()).toPNG());
     windows[0].setSize(820, 560);
     await wait(200);
+    await evaluate(0, `(() => { const tile = document.getElementById('remote-tile'); const bounds = tile.getBoundingClientRect(); tile.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: bounds.right - 4, clientY: bounds.bottom - 4 })); })()`);
     assert(await evaluate(0, `(() => { const range = document.getElementById('remote-volume').getBoundingClientRect(); const tile = document.getElementById('remote-tile').getBoundingClientRect(); return range.left >= tile.left && range.right <= tile.right && range.bottom <= tile.bottom; })()`), 'Slider stays inside the tile at the minimum window size');
     await evaluate(0, `document.getElementById('remote-tile').click()`);
     await wait(100);

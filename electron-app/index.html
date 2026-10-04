@@ -102,13 +102,15 @@
           <button id="btn-fullscreen" type="button">Tela cheia</button>
         </div>
         <div id="remote-context-menu" class="context-menu" hidden>
-          <button id="btn-remote-mute" type="button">Silenciar áudio</button>
-
-        </div>
-        <label class="volume-panel" for="remote-volume">
-            <span>Áudio da chamada <output id="remote-volume-value">100%</output></span>
+          <label class="context-volume" for="remote-volume">
+            <span>Voz da pessoa <output id="remote-volume-value">100%</output></span>
             <input id="remote-volume" type="range" min="0" max="200" value="100" step="1" />
           </label>
+          <label class="context-volume" for="screen-volume">
+            <span>Áudio da transmissão <output id="screen-volume-value">100%</output></span>
+            <input id="screen-volume" type="range" min="0" max="200" value="100" step="1" />
+          </label>
+        </div>
       </div>
 
       <div class="video-tile video-tile-local video-square" id="local-tile">
@@ -136,8 +138,14 @@
         <span class="dock-btn-label">Tela</span>
       </button>
 
+      <button id="btn-deafen" class="dock-btn" type="button" aria-pressed="false" aria-label="Silenciar todo o áudio recebido" title="Silenciar todo o áudio recebido">
+        <svg class="icon icon-hear-on" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 14v-3a8 8 0 0 1 16 0v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><rect x="3" y="12" width="4" height="8" rx="2" stroke="currentColor" stroke-width="1.8"/><rect x="17" y="12" width="4" height="8" rx="2" stroke="currentColor" stroke-width="1.8"/></svg>
+        <svg class="icon icon-hear-off" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 14v-3a8 8 0 0 1 1-4M8 4a8 8 0 0 1 12 7v3M3 3l18 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><rect x="3" y="12" width="4" height="8" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M17 16v2a2 2 0 0 0 4 0v-4a2 2 0 0 0-2-2" stroke="currentColor" stroke-width="1.8"/></svg>
+        <span class="dock-btn-label">Ouvir</span>
+      </button>
+
       <button id="btn-leave" class="dock-btn dock-btn-danger" type="button" aria-label="Sair da chamada">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 15v-2.2C4 8.6 7.6 5 12 5s8 3.6 8 7.8V15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4.5 14.2h3a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2v-1.3a.5.5 0 0 1 .5-.5ZM19.5 14.2h-3a1 1 0 0 0-1 1V18a1 1 0 0 0 1 1H18a2 2 0 0 0 2-2v-1.3a.5.5 0 0 0-.5-.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 11.5c5-4.7 13-4.7 18 0l-2 4-4-1v-3a13 13 0 0 0-6 0v3l-4 1-2-4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
         <span class="dock-btn-label">Sair</span>
       </button>
     </footer>
@@ -178,7 +186,7 @@
         <input id="settings-input-volume" type="range" min="0" max="200" value="100" step="1" />
       </label>
       <label class="settings-field" for="settings-output-volume">
-        <span>Volume de saída <output id="settings-output-value">100%</output></span>
+        <span>Volume geral de saída <output id="settings-output-value">100%</output></span>
         <input id="settings-output-volume" type="range" min="0" max="200" value="100" step="1" />
       </label>
       <div class="settings-divider"></div>

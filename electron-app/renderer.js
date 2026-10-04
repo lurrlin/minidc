@@ -23,7 +23,6 @@
   const activeRoomCode = document.getElementById('active-room-code');
   const copyActiveRoomButton = document.getElementById('copy-active-room');
   const callStatus = document.getElementById('call-status');
-  const stage = document.querySelector('.stage');
 
   const remoteVideo = document.getElementById('remote-video');
   const remoteAudio = document.getElementById('remote-audio');
@@ -32,15 +31,17 @@
   const localTile = document.getElementById('local-tile');
   const localTileLabel = document.getElementById('local-tile-label');
   const btnFullscreen = document.getElementById('btn-fullscreen');
-  const btnRemoteMute = document.getElementById('btn-remote-mute');
   const remoteContextMenu = document.getElementById('remote-context-menu');
 
   const btnMute = document.getElementById('btn-mute');
   const btnCamera = document.getElementById('btn-camera');
   const btnShare = document.getElementById('btn-share');
   const btnLeave = document.getElementById('btn-leave');
+  const btnDeafen = document.getElementById('btn-deafen');
   const remoteVolume = document.getElementById('remote-volume');
   const remoteVolumeValue = document.getElementById('remote-volume-value');
+  const screenVolume = document.getElementById('screen-volume');
+  const screenVolumeValue = document.getElementById('screen-volume-value');
   const settingsModal = document.getElementById('settings-modal');
   const openSettingsButton = document.getElementById('open-settings');
   const settingsCloseButton = document.getElementById('settings-close');
@@ -75,6 +76,7 @@
   let nativeAudioDestination = null;
   let nativeAudioCleanup = null;
   let remoteMixer = null;
+  let deafened = false;
   const speakingIndicators = new Map();
   let joining = false;
   let sharingBusy = false;
@@ -168,16 +170,25 @@
   }
 
   function ensureRemoteMixer() {
-    if (!remoteMixer) remoteMixer = new window.CallMedia.RemoteAudioMixer(remoteAudio);
+    if (!remoteMixer) {
+      remoteMixer = new window.CallMedia.RemoteAudioMixer(remoteAudio);
+      remoteMixer.setChannelVolume('voice', remoteVolume.value);
+      remoteMixer.setChannelVolume('screen', screenVolume.value);
+      remoteMixer.setDeafened(deafened);
+    }
     return remoteMixer;
   }
 
   async function applyRemoteVolume() {
-    const value = remoteVolume.value;
-    settingsOutputVolume.value = value;
-    for (const output of [remoteVolumeValue, settingsOutputValue]) output.textContent = value + '%';
+    remoteVolumeValue.textContent = `${remoteVolume.value}%`;
+    screenVolumeValue.textContent = `${screenVolume.value}%`;
+    settingsOutputValue.textContent = `${settingsOutputVolume.value}%`;
     try {
-      await ensureRemoteMixer().setVolume(value);
+      const mixer = ensureRemoteMixer();
+      mixer.setChannelVolume('voice', remoteVolume.value);
+      mixer.setChannelVolume('screen', screenVolume.value);
+      mixer.setDeafened(deafened);
+      await mixer.setVolume(settingsOutputVolume.value);
     } catch (error) {
       console.warn('Falha ao iniciar a saída de áudio:', error);
       showToast('Não foi possível iniciar o áudio. Tente ajustar o volume novamente.', 'error');
@@ -229,12 +240,6 @@
     createdRoomCode.textContent = '';
   }
 
-  function updateTileLayout() {
-    const compact = !remoteTile.classList.contains('has-video') && !localTile.classList.contains('has-video');
-    stage.classList.toggle('compact-layout', compact);
-  }
-
-  updateTileLayout();
 
   function generateRoomCode() {
     const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*+-=';
@@ -491,7 +496,6 @@
       btnCamera.setAttribute('aria-label', cameraTrack.enabled ? 'Desativar câmera' : 'Ativar câmera');
       localTile.classList.toggle('has-video', Boolean(screenStream || cameraTrack.enabled));
       sendSignal({ type: 'video-state', enabled: Boolean(screenStream || cameraTrack.enabled) });
-      updateTileLayout();
       return;
     }
 
@@ -506,7 +510,6 @@
         localVideo.srcObject = localStream;
       }
       localTile.classList.add('has-video', 'video-square');
-      updateTileLayout();
       btnCamera.setAttribute('aria-pressed', 'true');
       btnCamera.setAttribute('aria-label', 'Desativar câmera');
       sendSignal({ type: 'video-state', enabled: true });
@@ -773,7 +776,6 @@
           remoteTile.classList.add('screen-share');
           remoteVideoEnabled = true;
           remoteTile.classList.add('has-video');
-          updateTileLayout();
           renderProfiles();
         } else if (data.type === 'screen-share-stop') {
           remoteTile.classList.remove('screen-share');
@@ -781,7 +783,6 @@
         } else if (data.type === 'video-state') {
           remoteVideoEnabled = Boolean(data.enabled);
           remoteTile.classList.toggle('has-video', remoteVideoEnabled);
-          updateTileLayout();
         } else if (data.type === 'renegotiate' && isInitiator) {
           await renegotiateConnection();
         }
@@ -807,7 +808,6 @@
       renderProfiles();
       remoteVideoEnabled = null;
       pendingSignals = [];
-      updateTileLayout();
       setConnectionState('connecting');
       callStatus.textContent = 'esperando a outra pessoa voltar...';
       // Mantemos nossa PeerConnection e midia local de pe: quando ela
@@ -884,19 +884,18 @@
         remoteTile.classList.toggle('has-video', remoteVideoEnabled ?? !event.track.muted);
         event.track.onunmute = () => {
           remoteTile.classList.toggle('has-video', remoteVideoEnabled ?? true);
-          updateTileLayout();
         };
         event.track.onmute = () => {
           remoteTile.classList.remove('has-video');
-          updateTileLayout();
         };
-        updateTileLayout();
         remoteVideo.play().catch(() => {});
       } else if (event.track.kind === 'audio') {
         const mixer = ensureRemoteMixer();
-        mixer.addTrack(event.track);
-        mixer.setVolume(remoteVolume.value).catch(console.warn);
-        attachSpeakingIndicator(mixer.destination.stream, remoteTile);
+        const audioChannels = pc.getTransceivers().filter((channel) => channel.receiver.track.kind === 'audio');
+        const channel = event.transceiver === audioChannels[0] ? 'voice' : 'screen';
+        mixer.addTrack(event.track, channel);
+        applyRemoteVolume();
+        if (channel === 'voice') attachSpeakingIndicator(new MediaStream([event.track]), remoteTile);
       }
     };
 
@@ -985,16 +984,36 @@
 
   remoteVideo.muted = true;
   remoteVolume.addEventListener('input', applyRemoteVolume);
+  screenVolume.addEventListener('input', applyRemoteVolume);
 
-  settingsOutputVolume.addEventListener('input', () => {
-    remoteVolume.value = settingsOutputVolume.value;
-    remoteVolume.dispatchEvent(new Event('input'));
+  settingsOutputVolume.addEventListener('input', applyRemoteVolume);
+
+  function updateDeafenButton() {
+    btnDeafen.setAttribute('aria-pressed', String(deafened));
+    const label = deafened ? 'Voltar a ouvir o áudio' : 'Silenciar todo o áudio recebido';
+    btnDeafen.setAttribute('aria-label', label);
+    btnDeafen.title = label;
+    btnDeafen.querySelector('.dock-btn-label').textContent = deafened ? 'Silenciado' : 'Ouvir';
+  }
+
+  btnDeafen.addEventListener('click', () => {
+    deafened = !deafened;
+    remoteAudio.muted = deafened;
+    remoteMixer?.setDeafened(deafened);
+    updateDeafenButton();
   });
 
   function toggleVideoSize(tile, event) {
-    if (event.target.closest('button, input, label, select, .context-menu, .volume-panel')) return;
-    tile.classList.toggle('video-expanded');
-    tile.classList.toggle('video-square');
+    if (event.target.closest('button, input, label, select, .context-menu')) return;
+    const expand = !tile.classList.contains('video-expanded');
+    [localTile, remoteTile].forEach((item) => {
+      if (item !== tile) {
+        item.classList.remove('video-expanded');
+        item.classList.add('video-square');
+      }
+    });
+    tile.classList.toggle('video-expanded', expand);
+    tile.classList.toggle('video-square', !expand);
   }
 
   remoteTile.addEventListener('click', (event) => toggleVideoSize(remoteTile, event));
@@ -1029,13 +1048,6 @@
     remoteContextMenu.style.top = `${Math.max(8, Math.min(event.clientY - bounds.top, bounds.height - remoteContextMenu.offsetHeight - 8))}px`;
   });
   remoteContextMenu.addEventListener('click', (event) => event.stopPropagation());
-
-  btnRemoteMute.addEventListener('click', (event) => {
-    event.stopPropagation();
-    remoteAudio.muted = !remoteAudio.muted;
-    btnRemoteMute.textContent = remoteAudio.muted ? 'Desmutar live' : 'Mutar live';
-    closeRemoteContextMenu();
-  });
 
   document.addEventListener('click', closeRemoteContextMenu);
 
@@ -1210,7 +1222,6 @@
     localVideo.srcObject = screenStream;
     localTile.classList.add('screen-share');
     localTile.classList.add('has-video');
-    updateTileLayout();
     localTileLabel.textContent = 'Sua tela';
     renderProfiles();
     sendSignal({ type: 'screen-share-start' });
@@ -1243,7 +1254,6 @@
     localVideo.srcObject = localStream;
     localTile.classList.remove('screen-share');
     localTile.classList.toggle('has-video', Boolean(cameraTrack?.enabled));
-    updateTileLayout();
     localTileLabel.textContent = 'Você';
     renderProfiles();
     btnShare.setAttribute('aria-pressed', 'false');
@@ -1304,7 +1314,8 @@
     remoteTile.classList.remove('video-expanded');
     remoteTile.classList.add('video-square');
     remoteAudio.muted = false;
-    btnRemoteMute.textContent = 'Silenciar áudio';
+    deafened = false;
+    updateDeafenButton();
     closeRemoteContextMenu();
     settingsModal.hidden = true;
     closeSourcePicker();
@@ -1313,7 +1324,6 @@
     remoteTile.classList.remove('screen-share');
     remoteTile.classList.remove('has-video');
     document.getElementById('remote-empty').textContent = 'Envie o código e espere sua companhia.';
-    updateTileLayout();
 
     goToLobbyScreen();
   }
