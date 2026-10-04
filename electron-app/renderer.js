@@ -77,6 +77,8 @@
   let remoteMixer = null;
   const speakingIndicators = new Map();
   let joining = false;
+  let sharingBusy = false;
+  let remoteVideoEnabled = null;
   let pc = null;
   let currentRoom = null;
   let isInitiator = false;
@@ -161,7 +163,7 @@
   function goToLobbyScreen() {
     callScreen.hidden = true;
     lobbyScreen.hidden = false;
-    joinButton.disabled = false;
+    setJoining(false);
     setLobbyStatus('');
     resetLobbyMode();
   }
@@ -248,13 +250,12 @@
         audio: audioConstraints,
         video: false,
       });
-    } catch (videoError) {
-      // Duas instancias no mesmo PC podem disputar a mesma camera.
-      // Mantemos o audio para a chamada continuar mesmo sem video local.
-      console.warn('Camera indisponivel; tentando iniciar somente o audio:', videoError);
+    } catch (microphoneError) {
+      console.warn('Microfone selecionado indisponível; tentando o padrão:', microphoneError);
       try {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: getMicrophoneConstraints(''), video: false });
-        showToast('Camera ocupada. A chamada continuara somente com audio nesta janela.', 'info', 7000);
+        selectedMicrophoneId = '';
+        showToast('Microfone selecionado indisponível. Usando o dispositivo padrão.', 'info', 7000);
       } catch (audioError) {
         console.error('Nao foi possivel acessar camera/microfone:', audioError);
         throw audioError;
@@ -324,14 +325,20 @@
   }
 
   async function stopMicrophoneVolume() {
-    if (microphoneSender) {
-      const sourceTrack = localStream?.getAudioTracks()[0];
-      if (sourceTrack) await microphoneSender.replaceTrack(sourceTrack);
-    }
-    await microphoneGainContext?.close();
+    const context = microphoneGainContext;
+    const destination = microphoneGainDestination;
     microphoneGainContext = null;
     microphoneGainNode = null;
     microphoneGainDestination = null;
+    try {
+      const sourceTrack = localStream?.getAudioTracks()[0];
+      if (microphoneSender && sourceTrack && pc?.signalingState !== 'closed') {
+        await microphoneSender.replaceTrack(sourceTrack);
+      }
+    } finally {
+      destination?.stream.getTracks().forEach((track) => track.stop());
+      await context?.close();
+    }
   }
 
   async function applyMicrophoneVolume() {
@@ -352,6 +359,7 @@
   }
 
   async function refreshAudioOutputs() {
+    const selected = remoteAudio.sinkId;
     const devices = (await navigator.mediaDevices.enumerateDevices())
       .filter((device) => device.kind === 'audiooutput');
     settingsOutput.innerHTML = '';
@@ -361,6 +369,7 @@
       option.textContent = device.label || `Saida de audio ${index + 1}`;
       settingsOutput.appendChild(option);
     });
+    if (devices.some((device) => device.deviceId === selected)) settingsOutput.value = selected;
   }
 
   async function changeAudioOutput() {
@@ -374,8 +383,14 @@
   }
 
   async function openSettings() {
-    await Promise.all([refreshMicrophones(), refreshAudioOutputs()]);
-    settingsModal.hidden = false;
+    try {
+      await Promise.all([refreshMicrophones(), refreshAudioOutputs()]);
+      settingsModal.hidden = false;
+      settingsCloseButton.focus();
+    } catch (error) {
+      console.error(error);
+      showToast('Não foi possível listar os dispositivos de áudio.', 'error');
+    }
   }
 
   async function enableCamera() {
@@ -383,7 +398,9 @@
     if (cameraTrack) {
       cameraTrack.enabled = !cameraTrack.enabled;
       btnCamera.setAttribute('aria-pressed', String(cameraTrack.enabled));
+      btnCamera.setAttribute('aria-label', cameraTrack.enabled ? 'Desativar câmera' : 'Ativar câmera');
       localTile.classList.toggle('has-video', Boolean(screenStream || cameraTrack.enabled));
+      sendSignal({ type: 'video-state', enabled: Boolean(screenStream || cameraTrack.enabled) });
       updateTileLayout();
       return;
     }
@@ -401,6 +418,8 @@
       localTile.classList.add('has-video', 'video-square');
       updateTileLayout();
       btnCamera.setAttribute('aria-pressed', 'true');
+      btnCamera.setAttribute('aria-label', 'Desativar câmera');
+      sendSignal({ type: 'video-state', enabled: true });
     } catch (err) {
       showToast('Nao foi possivel ligar a camera.', 'error');
       console.error(err);
@@ -417,7 +436,13 @@
           super();
           this.chunks = [];
           this.offset = 0;
-          this.port.onmessage = (event) => this.chunks.push(event.data);
+          this.port.onmessage = (event) => {
+            if (this.chunks.length >= 20) {
+              this.chunks.shift();
+              this.offset = 0;
+            }
+            this.chunks.push(event.data);
+          };
         }
         process(_inputs, outputs) {
           const output = outputs[0];
@@ -430,7 +455,7 @@
             }
             const sampleIndex = this.offset * 2;
             output[0][frame] = chunk[sampleIndex] || 0;
-            output[1][frame] = chunk[sampleIndex + 1] || output[0][frame];
+            output[1][frame] = chunk[sampleIndex + 1] ?? output[0][frame];
             this.offset += 1;
             if (this.offset * 2 >= chunk.length) {
               this.chunks.shift();
@@ -455,7 +480,7 @@
       const samples = new Float32Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 4)).slice();
       nativeAudioNode?.port.postMessage(samples, [samples.buffer]);
     });
-    await window.electronAPI.startNativeAudio(pid);
+    if (!await window.electronAPI.startNativeAudio(pid)) throw new Error('A captura nativa não iniciou.');
     await nativeAudioContext.resume();
     return nativeAudioDestination.stream.getAudioTracks()[0];
   }
@@ -463,12 +488,19 @@
   async function stopNativeAudioCapture() {
     nativeAudioCleanup?.();
     nativeAudioCleanup = null;
-    await window.electronAPI.stopNativeAudio?.();
-    nativeAudioNode?.disconnect();
-    nativeAudioContext?.close();
+    const node = nativeAudioNode;
+    const destination = nativeAudioDestination;
+    const context = nativeAudioContext;
     nativeAudioNode = null;
     nativeAudioDestination = null;
     nativeAudioContext = null;
+    try {
+      await window.electronAPI.stopNativeAudio?.();
+    } finally {
+      node?.disconnect();
+      destination?.stream.getTracks().forEach((track) => track.stop());
+      await context?.close();
+    }
   }
 
   // ---------------------------------------------------------------------
@@ -483,17 +515,21 @@
   }
 
   async function renegotiateConnection() {
-    if (!pc || !isInitiator) return;
+    if (!pc || !isInitiator || !remotePeerReady) return;
     if (renegotiationInProgress || pc.signalingState !== 'stable') {
       renegotiationQueued = true;
       return;
     }
     renegotiationInProgress = true;
+    const connection = pc;
     try {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      sendSignal({ type: 'offer', sdp: serializeDescription(pc.localDescription) });
+      const offer = await connection.createOffer();
+      if (pc !== connection) return;
+      await connection.setLocalDescription(offer);
+      if (pc !== connection) return;
+      sendSignal({ type: 'offer', sdp: serializeDescription(connection.localDescription) });
     } catch (err) {
+      if (pc !== connection) return;
       console.error('Erro renegociando midia:', err);
       showToast(`Falha ao atualizar a midia: ${err.message || err}`, 'error', 9000);
     } finally {
@@ -557,9 +593,7 @@
       hasJoinedOnce = true;
 
       if (!pc) {
-        // Primeira vez entrando nesta sessao do app: pega a midia local
-        // e cria a PeerConnection. Em reconexoes, so re-anunciamos a sala
-        // (o pc so e recriado se realmente caiu, ver onconnectionstatechange).
+        // Keep local capture on reconnect, but negotiate a fresh connection.
         goToCallScreen(roomName);
         try {
           if (!localStream) await startLocalMedia();
@@ -596,13 +630,7 @@
     async function createOffer() {
       if (!pc || !isInitiator || !remotePeerReady) return;
       if (pc.signalingState !== 'stable') return;
-      try {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        sendSignal({ type: 'offer', sdp: serializeDescription(pc.localDescription) });
-      } catch (err) {
-        console.error('Erro criando offer:', err);
-      }
+      await renegotiateConnection();
     }
 
     window.electronAPI.socketOn('signal', async (data) => {
@@ -653,8 +681,15 @@
           }
         } else if (data.type === 'screen-share-start') {
           remoteTile.classList.add('screen-share');
+          remoteVideoEnabled = true;
+          remoteTile.classList.add('has-video');
+          updateTileLayout();
         } else if (data.type === 'screen-share-stop') {
           remoteTile.classList.remove('screen-share');
+        } else if (data.type === 'video-state') {
+          remoteVideoEnabled = Boolean(data.enabled);
+          remoteTile.classList.toggle('has-video', remoteVideoEnabled);
+          updateTileLayout();
         } else if (data.type === 'renegotiate' && isInitiator) {
           await renegotiateConnection();
         }
@@ -668,12 +703,14 @@
       showToast('A outra pessoa saiu da sala.', 'info');
       remoteVideo.srcObject = null;
       remoteVideo.dataset.empty = 'true';
+      document.getElementById('remote-empty').textContent = 'Esperando sua companhia voltar…';
       remoteTile.classList.remove('is-speaking', 'has-video', 'screen-share');
       speakingIndicators.get(remoteTile)?.();
       await remoteMixer?.close();
       remoteMixer = null;
       isInitiator = true;
       remotePeerReady = false;
+      remoteVideoEnabled = null;
       pendingSignals = [];
       updateTileLayout();
       setConnectionState('connecting');
@@ -743,7 +780,15 @@
       if (event.track.kind === 'video') {
         remoteVideo.srcObject = new MediaStream([event.track]);
         remoteVideo.dataset.empty = 'false';
-        remoteTile.classList.add('has-video', 'video-square');
+        remoteTile.classList.toggle('has-video', remoteVideoEnabled ?? !event.track.muted);
+        event.track.onunmute = () => {
+          remoteTile.classList.toggle('has-video', remoteVideoEnabled ?? true);
+          updateTileLayout();
+        };
+        event.track.onmute = () => {
+          remoteTile.classList.remove('has-video');
+          updateTileLayout();
+        };
         updateTileLayout();
         remoteVideo.play().catch(() => {});
       } else if (event.track.kind === 'audio') {
@@ -762,6 +807,8 @@
         clearTimeout(reconnectTimer);
         clearTimeout(iceFailureTimer);
         setConnectionState('connected');
+        document.getElementById('remote-empty').textContent = 'Câmera desligada. A conversa continua.';
+        sendSignal({ type: 'video-state', enabled: Boolean(screenStream || cameraTrack?.enabled) });
         if (screenStream) sendSignal({ type: 'screen-share-start' });
       } else if (pc.connectionState === 'disconnected') {
         setConnectionState('lost');
@@ -943,7 +990,23 @@
   });
 
   async function startScreenShare(sourceId, includeAudio = false, nativeAudioPid = null) {
+    if (sharingBusy || !localStream || !pc) return;
+    sharingBusy = true;
+    btnShare.disabled = true;
+    try {
+      await replaceScreenShare(sourceId, includeAudio, nativeAudioPid);
+    } catch (error) {
+      showToast('Não foi possível trocar a tela compartilhada.', 'error');
+      console.error(error);
+    } finally {
+      sharingBusy = false;
+      btnShare.disabled = false;
+    }
+  }
+
+  async function replaceScreenShare(sourceId, includeAudio, nativeAudioPid) {
     const previousScreenStream = screenStream;
+    const connection = pc;
     const useNativeAudio = includeAudio && nativeAudioPid && window.electronAPI.startNativeAudio;
     let nextScreenStream;
     try {
@@ -964,6 +1027,10 @@
           },
         },
       });
+      if (pc !== connection || !localStream) {
+        nextScreenStream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       screenStream = nextScreenStream;
     } catch (err) {
       showToast('Nao foi possivel iniciar o compartilhamento de tela.', 'error');
@@ -972,9 +1039,11 @@
     }
 
     const screenTrack = screenStream.getVideoTracks()[0];
+    await stopNativeAudioCapture();
     if (useNativeAudio) {
       try {
         screenAudioTrack = await startNativeAudioCapture(nativeAudioPid);
+        if (screenAudioTrack) screenStream.addTrack(screenAudioTrack);
       } catch (nativeError) {
         console.warn('WASAPI falhou; usando audio de sistema como fallback:', nativeError);
         await stopNativeAudioCapture();
@@ -997,11 +1066,30 @@
     // O coracao da troca: substitui a track de video no sender existente,
     // sem precisar renegociar a offer/answer.
     const sender = pc && (videoTransceiver?.sender || pc.getSenders().find((s) => s.track?.kind === 'video'));
-    if (sender) await sender.replaceTrack(screenTrack);
-    if (screenAudioTrack && screenAudioTransceiver) {
-      await screenAudioTransceiver.sender.replaceTrack(screenAudioTrack);
-    } else if (screenAudioTransceiver) {
-      await screenAudioTransceiver.sender.replaceTrack(null);
+    try {
+      if (sender) await sender.replaceTrack(screenTrack);
+    } catch (error) {
+      nextScreenStream.getTracks().forEach((track) => track.stop());
+      await stopNativeAudioCapture();
+      screenStream = previousScreenStream;
+      screenAudioTrack = previousScreenStream?.getAudioTracks()[0] || null;
+      throw error;
+    }
+    if (pc !== connection || !localStream) {
+      nextScreenStream.getTracks().forEach((track) => track.stop());
+      await stopNativeAudioCapture();
+      return;
+    }
+    if (screenAudioTransceiver) {
+      try {
+        await screenAudioTransceiver.sender.replaceTrack(screenAudioTrack || null);
+      } catch (error) {
+        console.warn('Áudio da tela indisponível:', error);
+        screenAudioTrack?.stop();
+        screenAudioTrack = null;
+        await stopNativeAudioCapture();
+        showToast('A tela está sendo compartilhada sem áudio.', 'info');
+      }
     }
 
     if (previousScreenStream && previousScreenStream !== screenStream) {
@@ -1011,10 +1099,11 @@
     // Preview local passa a mostrar a tela compartilhada.
     localVideo.srcObject = screenStream;
     localTile.classList.add('screen-share');
-    localTile.classList.add('has-video', 'video-square');
+    localTile.classList.add('has-video');
     updateTileLayout();
-    localTileLabel.textContent = 'sua tela';
+    localTileLabel.textContent = 'Sua tela';
     sendSignal({ type: 'screen-share-start' });
+    sendSignal({ type: 'video-state', enabled: true });
 
     btnShare.setAttribute('aria-pressed', 'true');
     stopScreenShareButton.hidden = false;
@@ -1047,6 +1136,7 @@
     localTileLabel.textContent = 'Você';
     btnShare.setAttribute('aria-pressed', 'false');
     sendSignal({ type: 'screen-share-stop' });
+    sendSignal({ type: 'video-state', enabled: Boolean(cameraTrack?.enabled) });
   }
 
   function leaveCall() {
@@ -1070,6 +1160,7 @@
     localStream = null;
     cameraTrack = null;
     screenStream = null;
+    remoteVideoEnabled = null;
     currentRoom = null;
     isInitiator = false;
     hasJoinedOnce = false;
@@ -1091,6 +1182,7 @@
     localVideo.srcObject = null;
     btnMute.setAttribute('aria-pressed', 'false');
     btnCamera.setAttribute('aria-pressed', 'false');
+    btnCamera.setAttribute('aria-label', 'Ativar câmera');
     btnShare.setAttribute('aria-pressed', 'false');
     localTile.classList.remove('screen-share', 'has-video', 'video-expanded');
     localTile.classList.add('video-square');
@@ -1104,6 +1196,7 @@
     localTileLabel.textContent = 'Você';
     remoteTile.classList.remove('screen-share');
     remoteTile.classList.remove('has-video');
+    document.getElementById('remote-empty').textContent = 'Envie o código e espere sua companhia.';
     updateTileLayout();
 
     goToLobbyScreen();

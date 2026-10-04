@@ -66,6 +66,13 @@ module.exports = async function testUI() {
     await evaluate(1, `document.getElementById('show-join-button').click(); document.getElementById('room-input').value = ${JSON.stringify(room)}; document.getElementById('join-form').requestSubmit();`);
     for (let i = 0; i < 2; i++) await until(i, `document.getElementById('connection-dot').classList.contains('conn-connected')`);
     checks.push('Production renderer connects two peers without cameras');
+    assert(await evaluate(0, `!document.getElementById('remote-tile').classList.contains('has-video')`), 'Audio-only call displays an avatar instead of a black video');
+    await evaluate(1, `document.getElementById('btn-camera').click()`);
+    await until(0, `document.getElementById('remote-tile').classList.contains('has-video')`);
+    await until(1, `document.getElementById('btn-camera').getAttribute('aria-pressed') === 'true'`);
+    await evaluate(1, `document.getElementById('btn-camera').click()`);
+    await until(0, `!document.getElementById('remote-tile').classList.contains('has-video')`);
+    checks.push('Camera can be enabled and disabled after an audio-only join');
     for (let i = 0; i < 2; i++) {
       await evaluate(i, `document.getElementById('btn-share').click()`);
       await until(i, `!document.getElementById('source-modal').hidden`);
@@ -73,6 +80,15 @@ module.exports = async function testUI() {
     }
     for (let i = 0; i < 2; i++) await until(i, `document.getElementById('remote-video').videoWidth > 0 && document.getElementById('remote-video').getVideoPlaybackQuality().totalVideoFrames > 0`);
     checks.push('Production renderer displays P1 and P2 screens simultaneously');
+    await evaluate(1, `document.getElementById('btn-share').click()`);
+    await until(1, `!document.getElementById('source-modal').hidden`);
+    await evaluate(1, `document.getElementById('stop-screen-share').click()`);
+    await until(0, `!document.getElementById('remote-tile').classList.contains('has-video')`);
+    await evaluate(1, `document.getElementById('btn-share').click()`);
+    await until(1, `!document.getElementById('source-modal').hidden`);
+    await evaluate(1, `document.querySelector('.source-option').click()`);
+    await until(0, `document.getElementById('remote-tile').classList.contains('has-video')`);
+    checks.push('Stopping sharing restores the disabled camera and sharing can restart');
     await evaluate(0, `document.getElementById('remote-volume').value = '200'; document.getElementById('remote-volume').dispatchEvent(new Event('input'));`);
     await wait(100);
     assert(await evaluate(0, `document.getElementById('settings-output-volume').value === '200' && document.getElementById('remote-volume-value').textContent === '200%'`), 'Volume controls remain synchronized');

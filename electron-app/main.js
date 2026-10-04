@@ -1,16 +1,21 @@
 const { app, BrowserWindow, ipcMain, desktopCapturer, systemPreferences } = require('electron');
-const nativeScreenAudio = require('electron-native-screenshare');
+let nativeScreenAudio = null;
+try {
+  nativeScreenAudio = require('electron-native-screenshare');
+} catch (error) {
+  console.warn('Áudio por janela indisponível; captura de sistema continua disponível:', error.message);
+}
 const path = require('path');
 
 let mainWindow;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1080,
-    height: 720,
+    width: 1200,
+    height: 800,
     minWidth: 820,
     minHeight: 560,
-    backgroundColor: '#16131d',
+    backgroundColor: '#10121b',
     autoHideMenuBar: true,
     title: 'unme',
     webPreferences: {
@@ -21,8 +26,13 @@ function createWindow() {
     },
   });
 
-  mainWindow.loadFile('index.html');
-
+  mainWindow.loadFile(path.join(__dirname, 'index.html'));
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
+  mainWindow.on('closed', () => {
+    if (nativeScreenAudio?.isAvailable()) nativeScreenAudio.stopCapture();
+    mainWindow = null;
+  });
 }
 
 ipcMain.handle('get-screen-sources', async () => {
@@ -43,7 +53,7 @@ ipcMain.handle('get-screen-sources', async () => {
 });
 
 function getNativeAudioPid(sourceId) {
-  if (!nativeScreenAudio.isAvailable() || !sourceId.startsWith('window:')) return null;
+  if (!nativeScreenAudio?.isAvailable() || !sourceId.startsWith('window:')) return null;
   const windowHandle = Number(sourceId.split(':')[1]);
   if (!Number.isInteger(windowHandle)) return null;
   try {
@@ -55,13 +65,13 @@ function getNativeAudioPid(sourceId) {
 }
 
 ipcMain.handle('start-native-audio', (_event, pid) => {
-  if (!nativeScreenAudio.isAvailable()) {
-    throw new Error(nativeScreenAudio.getLoadError() || 'WASAPI indisponivel.');
+  if (!nativeScreenAudio?.isAvailable()) {
+    throw new Error(nativeScreenAudio?.getLoadError() || 'WASAPI indisponivel.');
   }
   if (!Number.isInteger(pid) || pid <= 0) throw new Error('PID de audio invalido.');
 
   nativeScreenAudio.stopCapture();
-  nativeScreenAudio.startCapture(pid, true, (data, meta) => {
+  const started = nativeScreenAudio.startCapture(pid, true, (data, meta) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('native-audio-data', {
         data: new Uint8Array(data),
@@ -69,11 +79,12 @@ ipcMain.handle('start-native-audio', (_event, pid) => {
       });
     }
   });
-  return true;
+  if (!started) throw new Error('Não foi possível iniciar o áudio da janela.');
+  return started;
 });
 
 ipcMain.handle('stop-native-audio', () => {
-  if (!nativeScreenAudio.isAvailable()) return false;
+  if (!nativeScreenAudio?.isAvailable()) return false;
   return nativeScreenAudio.stopCapture();
 });
 

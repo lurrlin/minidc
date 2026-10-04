@@ -91,7 +91,7 @@ button:disabled { cursor: wait; opacity: .5; }
 .avatar { width: 92px; height: 92px; position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%); display: grid; place-items: center; border-radius: 30px; background: #3d3455; color: var(--accent); font-size: 32px; font-weight: 600; }
 .video-tile-local .avatar { background: #284239; color: var(--live); }.has-video .avatar { display: none; }
 .tile-empty-state { display: none; position: absolute; top: 62%; left: 20px; right: 20px; color: var(--text-faint); font-size: 12px; text-align: center; line-height: 1.6; }
-#remote-video[data-empty='true'] ~ .tile-empty-state { display: block; }
+.video-tile-remote:not(.has-video) .tile-empty-state { display: block; }
 .tile-label { position: absolute; left: 18px; bottom: 18px; color: var(--text); font-size: 12px; padding: 7px 10px; background: #10121bba; border-radius: 8px; z-index: 2; }
 .stage.compact-layout { align-items: center; justify-content: center; }.stage.compact-layout .video-tile { max-width: 360px; height: min(100%, 340px); min-height: 280px; }
 .stage:has(.video-expanded) .video-tile:not(.video-expanded) { flex: 0 0 180px; height: 190px; align-self: flex-end; }.stage .video-expanded { flex: 1; }
