@@ -21,7 +21,7 @@
   "devDependencies": {
     "@electron/rebuild": "^4.2.0",
     "electron": "^31.3.1",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "^26.15.3"
   },
   "build": {
     "appId": "com.pessoal.unme",
