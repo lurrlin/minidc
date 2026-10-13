@@ -90,6 +90,18 @@ As medições de áudio verificam a independência de voz/transmissão, ganho da
 
 Os testes simulados não substituem a conferência entre dois computadores de captura nativa de áudio, eficácia acústica da redução de ruído/eco em microfones físicos, permissões do sistema, seleção física de saída e comportamento de redes/NAT diferentes.
 
+### Desempenho e encerramento de chamadas
+
+Em `electron-app/`, execute `npm run test:performance`. Além da revisão funcional, ele mantém duas transmissões simultâneas de canvas em 1280 × 720 a 30 fps por 30 segundos, no renderer de produção, e mede quadros decodificados, tempo de decodificação, tráfego, CPU e memória dos processos do Electron. O relatório fica em `tests/artifacts/performance.json`. CPU e memória incluem o ambiente de testes; essa medição local não representa captura física nem desempenho pela internet e não comprova ausência de vazamentos em uso prolongado.
+
+Os testes funcionais repetem a saída/reentrada e verificam se microfones antigos foram encerrados, se os elementos de áudio foram liberados e se cada participante mantém apenas um mixer e uma conexão ativos. O áudio recebido pelo WebRTC também é medido no mixer, incluindo silêncio e restauração pelo botão Ouvir.
+
+### Marca e ícone
+
+Abra `docs/icon.html` no navegador para visualizar e baixar o símbolo `ü.` em PNG transparente de 1024 × 1024 pixels. A página funciona localmente sem dependências ou hospedagem. Os dois pontos representam os participantes. O PNG e o ICO usados no app e no instalador ficam em `electron-app/assets/`.
+
+Para exportar novamente o PNG a partir da página, execute `npx electron tests/export-icon.cjs` em `electron-app/`. Ao alterar a marca, atualize também o ICO com os tamanhos 16, 24, 32, 48, 64, 128 e 256 pixels antes de gerar o instalador.
+
 ## Gerar instalador
 
 ```powershell

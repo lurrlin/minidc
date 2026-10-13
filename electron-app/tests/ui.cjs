@@ -2,8 +2,8 @@ const { BrowserWindow, ipcMain } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 
-module.exports = async function testUI() {
-  const windows = [0, 1].map((index) => new BrowserWindow({ show: false, width: 1200, height: 800, webPreferences: { offscreen: true, partition: `persist:peer-${index}`, preload: path.join(__dirname, 'preload.cjs') } }));
+module.exports = async function testUI({ benchmark = false } = {}) {
+  const windows = [0, 1].map((index) => new BrowserWindow({ show: false, width: 1200, height: 800, webPreferences: { offscreen: true, backgroundThrottling: false, partition: `persist:peer-${index}`, preload: path.join(__dirname, 'preload.cjs') } }));
   windows.forEach((window, index) => window.webContents.on('console-message', (_event, level, message) => { if (level >= 2) console.log(`UI P${index + 1}: ${message}`); }));
   const participants = new Map();
   let profileWasSignaled = false;
@@ -70,6 +70,11 @@ module.exports = async function testUI() {
       window.__microphoneCaptures = [];
       window.__outgoingMicrophoneTracks = [];
       window.__remoteMixers = [];
+      window.__connections = [];
+      const OriginalConnection = RTCPeerConnection;
+      window.RTCPeerConnection = class extends OriginalConnection {
+        constructor(options) { super(options); window.__connections.push(this); }
+      };
       const OriginalMixer = CallMedia.RemoteAudioMixer;
       CallMedia.RemoteAudioMixer = class extends OriginalMixer {
         constructor(element) { super(element); this.assignments = []; window.__remoteMixers.push(this); }
@@ -92,15 +97,18 @@ module.exports = async function testUI() {
           return stream;
         }
         const canvas = document.createElement('canvas');
-        canvas.width = 640; canvas.height = 360;
+        canvas.width = ${benchmark ? 1280 : 640}; canvas.height = ${benchmark ? 720 : 360};
         const context = canvas.getContext('2d');
         let frame = 0;
         const timer = setInterval(() => {
-          context.fillStyle = '${i ? '#284239' : '#3d3455'}'; context.fillRect(0,0,640,360);
+          context.fillStyle = '${i ? '#284239' : '#3d3455'}'; context.fillRect(0,0,canvas.width,canvas.height);
           context.fillStyle = 'white'; context.font = '24px sans-serif'; context.fillText('Tela P${i + 1} / ' + frame++, 40, 80);
-        }, 60);
-        const stream = canvas.captureStream(15);
-        stream.getVideoTracks()[0].addEventListener('ended', () => clearInterval(timer));
+          context.fillRect((frame * 11) % canvas.width, 160, 120, 120);
+        }, ${benchmark ? 33 : 60});
+        const stream = canvas.captureStream(${benchmark ? 30 : 15});
+        const track = stream.getVideoTracks()[0];
+        const originalStop = track.stop.bind(track);
+        track.stop = () => { clearInterval(timer); originalStop(); };
         return stream;
       };
       void 0;
@@ -136,6 +144,7 @@ module.exports = async function testUI() {
     }
     for (let i = 0; i < 2; i++) await until(i, `document.getElementById('remote-video').videoWidth > 0 && document.getElementById('remote-video').getVideoPlaybackQuality().totalVideoFrames > 0`);
     checks.push('Production renderer displays P1 and P2 screens simultaneously');
+    if (benchmark) await require('./performance.cjs')({ windows, evaluate, wait, assert, artifacts });
     assert(await evaluate(0, `(() => { const bounds = document.getElementById('remote-tile').getBoundingClientRect(); return Math.abs(bounds.width - window.__emptyTileSize.width) < 1 && Math.abs(bounds.height - window.__emptyTileSize.height) < 1; })()`), 'Starting video does not change the empty tile dimensions');
     await evaluate(0, `document.getElementById('btn-fullscreen').click()`);
     await until(0, `document.fullscreenElement === document.getElementById('remote-tile')`);
@@ -215,6 +224,15 @@ module.exports = async function testUI() {
     checks.push('Active screen sharing survives the other participant rejoining');
     await until(1, `document.getElementById('remote-tile-label').textContent === 'Alex Novo'`);
     checks.push('An edited profile is shared again after rejoining');
+    for (let cycle = 0; cycle < 3; cycle++) {
+      await evaluate(1, `document.getElementById('btn-leave').click()`);
+      await until(1, `window.__remoteMixers.every((mixer) => mixer.context.state === 'closed' && mixer.inputs.size === 0 && mixer.sources.size === 0)`);
+      assert(await evaluate(1, `window.__connections.every((connection) => connection.signalingState === 'closed') && window.__microphoneCaptures.every(({ track }) => track.readyState === 'ended')`), `Leave/rejoin cycle ${cycle + 1}: previous microphone, playback and connections are released`);
+      await until(0, `window.__remoteMixers.every((mixer) => mixer.context.state === 'closed')`);
+      await evaluate(1, `document.getElementById('show-join-button').click(); document.getElementById('room-input').value = ${JSON.stringify(room)}; document.getElementById('join-form').requestSubmit();`);
+      for (let i = 0; i < 2; i++) await until(i, `document.getElementById('connection-dot').classList.contains('conn-connected') && window.__remoteMixers.at(-1).context.state === 'running'`);
+      for (let i = 0; i < 2; i++) assert(await evaluate(i, `window.__remoteMixers.filter((mixer) => mixer.context.state !== 'closed').length === 1 && window.__connections.filter((connection) => connection.signalingState !== 'closed').length === 1`), `Leave/rejoin cycle ${cycle + 1}, P${i + 1}: exactly one active mixer and connection`);
+    }
     await evaluate(0, `document.getElementById('btn-leave').click()`);
     await windows[0].loadFile(path.join(__dirname, '../index.html'));
     assert(await evaluate(0, `ProfileUI.getProfile().name === 'Alex Novo' && !!document.querySelector('#lobby-profile-avatar img')`), 'Profile choices persist after recreating the page');

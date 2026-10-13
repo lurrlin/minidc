@@ -8,6 +8,7 @@
   "author": "lurrlin",
   "scripts": {
     "test": "electron tests/run.cjs",
+    "test:performance": "electron tests/run.cjs --performance",
     "start": "electron .",
     "dist": "electron-builder",
     "dist:win": "electron-builder --win",
