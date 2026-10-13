@@ -25,7 +25,7 @@
     <h1>Duas pessoas. Uma conversa.</h1>
     <p>O novo símbolo do Unme: os dois pontos do <strong>ü</strong><br>representam quem está de cada lado da chamada.</p>
     <div class="preview">
-      <canvas id="icon" width="1024" height="1024" aria-label="Marca Unme: ü. em um quadrado lilás"></canvas>
+      <canvas id="icon" width="1024" height="1024" aria-label="Marca Unme: ü em um quadrado lilás"></canvas>
       <div class="sizes" aria-label="Prévia do ícone em tamanhos menores">
         <img width="16" height="16" alt="Ícone de 16 pixels">
         <img width="32" height="32" alt="Ícone de 32 pixels">
@@ -44,7 +44,7 @@
     context.fill();
     context.fillStyle = '#29203e';
     context.font = '700 654px "Segoe UI", sans-serif';
-    const label = 'ü.';
+    const label = 'ü';
     const metrics = context.measureText(label);
     const x = (1024 - metrics.width) / 2;
     const y = (1024 + metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2;

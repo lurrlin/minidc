@@ -47,8 +47,8 @@ button:disabled { cursor: wait; opacity: .5; }
 .lobby-intro h1 em { font-style: normal; color: var(--accent); }
 .lobby-intro p { color: var(--text-dim); line-height: 1.8; font-size: 15px; }
 .connection-art { display: flex; align-items: center; width: 190px; margin: 28px 0; }
-.art-person { width: 56px; height: 56px; border-radius: 19px; background: #39324e; color: var(--accent); display: grid; place-items: center; font-size: 26px; font-weight: 600; transform: rotate(-8deg); border: 1px solid #5b4b7b; }
-.art-person-other { background: #243e3a; color: var(--live); border-color: #40675a; transform: rotate(8deg); font-size: 19px; }
+.art-person { width: 56px; height: 56px; border-radius: 19px; background: #39324e; color: var(--accent); display: grid; place-items: center; font-size: 26px; font-weight: 600; border: 1px solid #5b4b7b; }
+.art-person-other { background: #243e3a; color: var(--live); border-color: #40675a; font-size: 19px; }
 .art-line { flex: 1; border-top: 1px dashed var(--text-faint); margin: 0 10px; }
 .lobby-features { display: flex; flex-wrap: wrap; gap: 16px; color: var(--text-faint); font-size: 11px; }
 .lobby-features span::before { content: '•'; color: var(--live); margin-right: 6px; }

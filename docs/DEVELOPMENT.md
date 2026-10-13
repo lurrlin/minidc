@@ -98,7 +98,7 @@ Os testes funcionais repetem a saída/reentrada e verificam se microfones antigo
 
 ### Marca e ícone
 
-Abra `docs/icon.html` no navegador para visualizar e baixar o símbolo `ü.` em PNG transparente de 1024 × 1024 pixels. A página funciona localmente sem dependências ou hospedagem. Os dois pontos representam os participantes. O PNG e o ICO usados no app e no instalador ficam em `electron-app/assets/`.
+Abra `docs/icon.html` no navegador para visualizar e baixar o símbolo `ü` em PNG transparente de 1024 × 1024 pixels. A página funciona localmente sem dependências ou hospedagem. Os dois pontos representam os participantes. O PNG e o ICO usados no app e no instalador ficam em `electron-app/assets/`.
 
 Para exportar novamente o PNG a partir da página, execute `npx electron tests/export-icon.cjs` em `electron-app/`. Ao alterar a marca, atualize também o ICO com os tamanhos 16, 24, 32, 48, 64, 128 e 256 pixels antes de gerar o instalador.
 
