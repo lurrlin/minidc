@@ -53,7 +53,7 @@ module.exports = async ({ windows, evaluate, wait, assert, artifacts }) => {
     };
   });
   const report = {
-    workload: 'Two production renderer windows, synthetic moving 1280x720 canvas screens at 30 fps, fake microphones, local WebRTC',
+    workload: 'Two production renderer windows with normal rendering, synthetic moving 1280x720 canvas screens at 30 fps, fake microphones, local WebRTC',
     durationSeconds: 30, peers,
     meanHarnessCpuPercent: Number((processSamples.reduce((sum, sample) => sum + sample.cpuPercent, 0) / processSamples.length).toFixed(2)),
     peakHarnessWorkingSetMiB: Number(Math.max(...processSamples.map((sample) => sample.workingSetMiB)).toFixed(1)),

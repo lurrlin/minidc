@@ -4,7 +4,7 @@ Este guia é para quem trabalha no código. Para instalar e usar o aplicativo, c
 
 ## Rodar o projeto
 
-Use Node.js 22 ou mais recente e npm. São dois processos separados:
+Use Node.js 22.12 ou mais recente e npm. São dois processos separados:
 
 ```powershell
 # Terminal 1 — servidor local
@@ -92,7 +92,7 @@ Os testes simulados não substituem a conferência entre dois computadores de ca
 
 ### Desempenho e encerramento de chamadas
 
-Em `electron-app/`, execute `npm run test:performance`. Além da revisão funcional, ele mantém duas transmissões simultâneas de canvas em 1280 × 720 a 30 fps por 30 segundos, no renderer de produção, e mede quadros decodificados, tempo de decodificação, tráfego, CPU e memória dos processos do Electron. O relatório fica em `tests/artifacts/performance.json`. CPU e memória incluem o ambiente de testes; essa medição local não representa captura física nem desempenho pela internet e não comprova ausência de vazamentos em uso prolongado.
+Em `electron-app/`, execute `npm run test:performance`. Além da revisão funcional, ele mantém duas transmissões simultâneas de canvas em 1280 × 720 a 30 fps por 30 segundos, no renderer de produção com renderização normal, e mede quadros decodificados, tempo de decodificação, tráfego, CPU e memória dos processos do Electron. O relatório fica em `tests/artifacts/performance.json`. CPU e memória incluem o ambiente de testes; essa medição local não representa captura física nem desempenho pela internet e não comprova ausência de vazamentos em uso prolongado. O modo offscreen é usado nos testes funcionais comuns, mas seu custo adicional de memória e CPU não representa o aplicativo distribuído.
 
 Os testes funcionais repetem a saída/reentrada e verificam se microfones antigos foram encerrados, se os elementos de áudio foram liberados e se cada participante mantém apenas um mixer e uma conexão ativos. O áudio recebido pelo WebRTC também é medido no mixer, incluindo silêncio e restauração pelo botão Ouvir.
 
@@ -101,6 +101,16 @@ Os testes funcionais repetem a saída/reentrada e verificam se microfones antigo
 Abra `docs/icon.html` no navegador para visualizar e baixar o símbolo `ü` em PNG transparente de 1024 × 1024 pixels. A página funciona localmente sem dependências ou hospedagem. Os dois pontos representam os participantes. O PNG e o ICO usados no app e no instalador ficam em `electron-app/assets/`.
 
 Para exportar novamente o PNG a partir da página, execute `npx electron tests/export-icon.cjs` em `electron-app/`. Ao alterar a marca, atualize também o ICO com os tamanhos 16, 24, 32, 48, 64, 128 e 256 pixels antes de gerar o instalador.
+
+### Dependências e auditoria de segurança
+
+O aplicativo usa Electron 44 e electron-builder 26. O runtime requer Windows de 64 bits; para macOS, a versão mínima é 13. Execute `npm audit` tanto em `electron-app/` quanto em `signaling-server/` para conferir os avisos conhecidos das dependências instaladas. O Electron está em `devDependencies`, mas faz parte do app distribuído: não use apenas `npm audit --omit=dev` para avaliar a segurança do instalador.
+
+O override de `global-agent` para 4.1.3 remove a cadeia de logging vulnerável mantida pelo downloader do electron-builder. A API de proxy usada pelo downloader é conferida com `npm run test:build`, por meio de um proxy HTTP local. Reavalie o override quando o builder atualizar essa dependência. A auditoria sem alertas não substitui os testes funcionais nem uma revisão completa de segurança.
+
+Depois de gerar o instalador Windows, execute `npm run test:packaged`. Esse teste carrega o código de produção do `app.asar` com o Electron atualizado, confere o preload, o ícone, a versão e a disponibilidade do módulo nativo de áudio, além da ausência de arquivos de testes e `.env` no pacote. Usa um perfil temporário; não inicia captura de áudio nem instala o executável no sistema.
+
+No servidor, `npm run dev` usa `node --watch server.js`, sem nodemon. A remoção do nodemon elimina a cadeia de padrões vulnerável usada apenas no desenvolvimento. `npm start` continua executando o servidor normalmente.
 
 ## Gerar instalador
 

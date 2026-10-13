@@ -3,8 +3,8 @@ const path = require('node:path');
 const fs = require('node:fs');
 
 module.exports = async function testUI({ benchmark = false } = {}) {
-  const windows = [0, 1].map((index) => new BrowserWindow({ show: false, width: 1200, height: 800, webPreferences: { offscreen: true, backgroundThrottling: false, partition: `persist:peer-${index}`, preload: path.join(__dirname, 'preload.cjs') } }));
-  windows.forEach((window, index) => window.webContents.on('console-message', (_event, level, message) => { if (level >= 2) console.log(`UI P${index + 1}: ${message}`); }));
+  const windows = [0, 1].map((index) => new BrowserWindow({ show: false, width: 1200, height: 800, webPreferences: { offscreen: !benchmark, backgroundThrottling: false, partition: `persist:peer-${index}`, preload: path.join(__dirname, 'preload.cjs') } }));
+  windows.forEach((window, index) => window.webContents.on('console-message', ({ level, message }) => { if (level === 'warning' || level === 'error') console.log(`UI P${index + 1}: ${message}`); }));
   const participants = new Map();
   let profileWasSignaled = false;
   const checks = [];

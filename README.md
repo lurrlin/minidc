@@ -13,7 +13,7 @@ O Unme é um aplicativo desktop para chamadas de voz, vídeo e compartilhamento 
 3. Execute o instalador, siga as etapas e abra o **Unme**.
 4. Peça à outra pessoa para instalar a mesma versão.
 
-O instalador inclui o necessário para executar o aplicativo. Você precisa de conexão com a internet e de um microfone para conversar; a câmera é opcional.
+O instalador é para Windows de 64 bits e inclui o necessário para executar o aplicativo. Você precisa de conexão com a internet e de um microfone para conversar; a câmera é opcional.
 
 ## Começar uma chamada
 
