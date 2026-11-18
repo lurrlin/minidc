@@ -50,6 +50,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".ServicoChamada"
+            android:exported="false"
+            android:foregroundServiceType="microphone|camera|mediaProjection" />
     </application>
 
 </manifest>
