@@ -1,19 +1,1005 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/cor_fundo"
     tools:context=".MainActivity">
 
+    <!-- ===================== TELA 1: LOBBY ===================== -->
+    <ScrollView
+        android:id="@+id/tela_lobby"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingHorizontal="24dp"
+            android:paddingTop="24dp"
+            android:paddingBottom="36dp">
+
+            <!-- Marca no topo -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="@drawable/fundo_simbolo_marca"
+                    android:gravity="center"
+                    android:text="@string/marca_simbolo"
+                    android:textColor="@color/cor_destaque_tinta"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:text="@string/marca_nome"
+                    android:textColor="@color/cor_texto"
+                    android:textSize="22sp"
+                    android:textStyle="bold" />
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="16dp"
+                    android:layout_marginHorizontal="14dp"
+                    android:background="@color/cor_borda" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:letterSpacing="0.14"
+                    android:text="@string/marca_legenda"
+                    android:textColor="@color/cor_texto_apagado"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
+            <!-- Introdução -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="28dp"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <View
+                        android:layout_width="6dp"
+                        android:layout_height="6dp"
+                        android:background="@drawable/ponto_conectado" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:letterSpacing="0.1"
+                        android:text="@string/lobby_selo_ao_vivo"
+                        android:textAllCaps="true"
+                        android:textColor="@color/cor_texto_secundario"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:gravity="center"
+                    android:lineSpacingExtra="2dp"
+                    android:text="@string/lobby_titulo_intro"
+                    android:textColor="@color/cor_texto"
+                    android:textSize="32sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="@string/lobby_titulo_intro_destaque"
+                    android:textColor="@color/cor_destaque"
+                    android:textSize="32sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:gravity="center"
+                    android:lineSpacingExtra="4dp"
+                    android:text="@string/lobby_descricao_intro"
+                    android:textColor="@color/cor_texto_secundario"
+                    android:textSize="14sp" />
+
+                <!-- Arte de conexão entre os dois participantes -->
+                <LinearLayout
+                    android:layout_width="180dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="@drawable/fundo_arte_pessoa"
+                        android:gravity="center"
+                        android:text="ü"
+                        android:textColor="@color/cor_destaque"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_marginHorizontal="10dp"
+                        android:layout_weight="1"
+                        android:background="@color/cor_texto_apagado" />
+
+                    <TextView
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="@drawable/fundo_arte_outra"
+                        android:gravity="center"
+                        android:text="me"
+                        android:textColor="@color/cor_ao_vivo"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/lobby_recurso_voz"
+                        android:textColor="@color/cor_texto_apagado"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:text="@string/lobby_recurso_tela"
+                        android:textColor="@color/cor_texto_apagado"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:text="@string/lobby_recurso_dois"
+                        android:textColor="@color/cor_texto_apagado"
+                        android:textSize="11sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Card de Ações do Lobby -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="26dp"
+                android:background="@drawable/fundo_card_lobby"
+                android:orientation="vertical"
+                android:padding="26dp">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="20dp"
+                    android:orientation="horizontal">
+
+                    <View
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:background="@drawable/ponto_marca_a" />
+
+                    <View
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_marginStart="-8dp"
+                        android:background="@drawable/ponto_marca_b" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:letterSpacing="0.12"
+                    android:text="@string/lobby_comece_aqui"
+                    android:textColor="@color/cor_texto_secundario"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/lobby_card_titulo"
+                    android:textColor="@color/cor_texto"
+                    android:textSize="22sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="22dp"
+                    android:lineSpacingExtra="4dp"
+                    android:text="@string/lobby_card_subtitulo"
+                    android:textColor="@color/cor_texto_secundario"
+                    android:textSize="13sp" />
+
+                <!-- Botões iniciais -->
+                <LinearLayout
+                    android:id="@+id/container_acoes_lobby"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/botao_criar_sala"
+                        android:layout_width="match_parent"
+                        android:layout_height="46dp"
+                        android:background="@drawable/fundo_botao_primario"
+                        android:text="@string/botao_criar_sala"
+                        android:textAllCaps="false"
+                        android:textColor="@color/cor_destaque_tinta"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/botao_mostrar_entrar"
+                        android:layout_width="match_parent"
+                        android:layout_height="46dp"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/fundo_botao_secundario"
+                        android:text="@string/botao_mostrar_entrar"
+                        android:textAllCaps="false"
+                        android:textColor="@color/cor_texto"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- Formulário Entrar em uma sala -->
+                <LinearLayout
+                    android:id="@+id/formulario_entrar_sala"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <EditText
+                        android:id="@+id/campo_codigo_sala"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/fundo_campo_texto"
+                        android:hint="@string/dica_codigo_sala"
+                        android:imeOptions="actionGo"
+                        android:inputType="textNoSuggestions"
+                        android:maxLength="40"
+                        android:padding="14dp"
+                        android:singleLine="true"
+                        android:textColor="@color/cor_texto"
+                        android:textColorHint="@color/cor_texto_apagado"
+                        android:textSize="14sp" />
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/botao_entrar_sala"
+                        android:layout_width="match_parent"
+                        android:layout_height="46dp"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/fundo_botao_primario"
+                        android:text="@string/botao_entrar_sala"
+                        android:textAllCaps="false"
+                        android:textColor="@color/cor_destaque_tinta"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/botao_voltar_lobby"
+                        android:layout_width="match_parent"
+                        android:layout_height="46dp"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/fundo_botao_secundario"
+                        android:text="@string/botao_voltar"
+                        android:textAllCaps="false"
+                        android:textColor="@color/cor_texto"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- Código da sala criada -->
+                <LinearLayout
+                    android:id="@+id/container_sala_criada"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/rotulo_codigo_sala"
+                        android:textColor="@color/cor_texto_secundario"
+                        android:textSize="11sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/texto_codigo_criado"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="monospace"
+                            android:textColor="@color/cor_destaque"
+                            android:textIsSelectable="true"
+                            android:textSize="13sp" />
+
+                        <androidx.appcompat.widget.AppCompatButton
+                            android:id="@+id/botao_copiar_sala_lobby"
+                            android:layout_width="wrap_content"
+                            android:layout_height="38dp"
+                            android:layout_marginStart="8dp"
+                            android:background="@drawable/fundo_botao_secundario"
+                            android:paddingHorizontal="14dp"
+                            android:text="@string/botao_copiar"
+                            android:textAllCaps="false"
+                            android:textColor="@color/cor_texto"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Status do Lobby -->
+                <TextView
+                    android:id="@+id/texto_status_lobby"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:minHeight="18dp"
+                    android:textColor="@color/cor_texto_secundario"
+                    android:textSize="12sp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="14dp"
+                    android:background="@color/cor_borda" />
+
+                <!-- Botão Editar Perfil -->
+                <LinearLayout
+                    android:id="@+id/botao_editar_perfil"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingVertical="4dp">
+
+                    <FrameLayout
+                        android:id="@+id/container_avatar_lobby"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/fundo_avatar_pequeno">
+
+                        <ImageView
+                            android:id="@+id/imagem_avatar_lobby"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="centerCrop"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/texto_avatar_lobby"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:text="V"
+                            android:textColor="@color/cor_destaque"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/texto_nome_perfil_lobby"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:text="@string/perfil_padrao_lobby"
+                            android:textColor="@color/cor_texto"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/perfil_editar_subtitulo"
+                            android:textColor="@color/cor_texto_apagado"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="↗"
+                        android:textColor="@color/cor_destaque"
+                        android:textSize="16sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- ===================== TELA 2: CHAMADA ===================== -->
+    <LinearLayout
+        android:id="@+id/tela_chamada"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <!-- Cabeçalho da chamada -->
+        <LinearLayout
+            android:id="@+id/cabecalho_chamada"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="12dp">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/fundo_selo_sala"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="7dp">
+
+                <View
+                    android:id="@+id/ponto_conexao"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:background="@drawable/ponto_conectando" />
+
+                <TextView
+                    android:id="@+id/texto_rotulo_sala"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:ellipsize="end"
+                    android:maxWidth="105dp"
+                    android:maxLines="1"
+                    android:textColor="@color/cor_texto"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/texto_status_chamada"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="2"
+                android:text="@string/status_conectando"
+                android:textColor="@color/cor_texto_apagado"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/texto_codigo_sala_ativa"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/botao_copiar_sala_ativa"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/fundo_botao_cabecalho"
+                android:gravity="center"
+                android:paddingHorizontal="12dp"
+                android:text="@string/botao_copiar"
+                android:textColor="@color/cor_texto_secundario"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/botao_abrir_configuracoes"
+                android:layout_width="38dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/fundo_botao_cabecalho"
+                android:contentDescription="@string/configuracoes_titulo"
+                android:gravity="center"
+                android:text="⚙"
+                android:textColor="@color/cor_texto_secundario"
+                android:textSize="17sp" />
+        </LinearLayout>
+
+        <!-- Palco com os dois quadros -->
+        <LinearLayout
+            android:id="@+id/palco_videos"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingHorizontal="14dp"
+            android:paddingBottom="10dp">
+
+            <!-- Quadro Remoto -->
+            <FrameLayout
+                android:id="@+id/quadro_remoto"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="@drawable/fundo_quadro_padrao"
+                android:clickable="true"
+                android:focusable="true">
+
+                <org.webrtc.SurfaceViewRenderer
+                    android:id="@+id/video_remoto"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone" />
+
+                <FrameLayout
+                    android:id="@+id/container_avatar_remoto"
+                    android:layout_width="86dp"
+                    android:layout_height="86dp"
+                    android:layout_gravity="center"
+                    android:layout_marginBottom="12dp"
+                    android:background="@drawable/fundo_avatar_remoto">
+
+                    <ImageView
+                        android:id="@+id/imagem_avatar_remoto"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/texto_avatar_remoto"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:text="SC"
+                        android:textColor="@color/cor_destaque"
+                        android:textSize="28sp"
+                        android:textStyle="bold" />
+                </FrameLayout>
+
+                <TextView
+                    android:id="@+id/texto_vazio_remoto"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="56dp"
+                    android:gravity="center"
+                    android:paddingHorizontal="20dp"
+                    android:text="@string/vazio_remoto_inicial"
+                    android:textColor="@color/cor_texto_apagado"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/texto_rotulo_quadro_remoto"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|start"
+                    android:layout_margin="14dp"
+                    android:background="@drawable/fundo_rotulo_quadro"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:paddingHorizontal="10dp"
+                    android:paddingVertical="6dp"
+                    android:text="@string/rotulo_sua_companhia"
+                    android:textColor="@color/cor_texto"
+                    android:textSize="12sp" />
+
+                <LinearLayout
+                    android:id="@+id/container_acoes_video_remoto"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="top|end"
+                    android:layout_margin="12dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/botao_volume_remoto"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/fundo_acao_quadro"
+                        android:paddingHorizontal="10dp"
+                        android:paddingVertical="7dp"
+                        android:text="Volume"
+                        android:textColor="@color/cor_texto"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:id="@+id/botao_tela_cheia"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:background="@drawable/fundo_acao_quadro"
+                        android:paddingHorizontal="10dp"
+                        android:paddingVertical="7dp"
+                        android:text="@string/botao_tela_cheia"
+                        android:textColor="@color/cor_texto"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <!-- Menu M2 / Toque Longo de volumes independentes -->
+                <LinearLayout
+                    android:id="@+id/menu_contexto_remoto"
+                    android:layout_width="256dp"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="48dp"
+                    android:layout_marginEnd="12dp"
+                    android:background="@drawable/fundo_menu_contexto"
+                    android:clickable="true"
+                    android:elevation="8dp"
+                    android:focusable="true"
+                    android:orientation="vertical"
+                    android:padding="12dp"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/rotulo_voz_pessoa"
+                            android:textColor="@color/cor_texto_secundario"
+                            android:textSize="11sp" />
+
+                        <TextView
+                            android:id="@+id/texto_valor_volume_voz"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="100%"
+                            android:textColor="@color/cor_destaque"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <SeekBar
+                        android:id="@+id/barra_volume_voz"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:max="200"
+                        android:progress="100"
+                        android:progressBackgroundTint="@color/cor_borda"
+                        android:progressTint="@color/cor_destaque"
+                        android:thumbTint="@color/cor_destaque" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginVertical="8dp"
+                        android:background="@color/cor_borda" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/rotulo_audio_transmissao"
+                            android:textColor="@color/cor_texto_secundario"
+                            android:textSize="11sp" />
+
+                        <TextView
+                            android:id="@+id/texto_valor_volume_tela"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="100%"
+                            android:textColor="@color/cor_destaque"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <SeekBar
+                        android:id="@+id/barra_volume_tela"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:max="200"
+                        android:progress="100"
+                        android:progressBackgroundTint="@color/cor_borda"
+                        android:progressTint="@color/cor_destaque"
+                        android:thumbTint="@color/cor_destaque" />
+                </LinearLayout>
+            </FrameLayout>
+
+            <!-- Espaçador entre os quadros -->
+            <View
+                android:id="@+id/espacador_quadros"
+                android:layout_width="12dp"
+                android:layout_height="12dp" />
+
+            <!-- Quadro Local -->
+            <FrameLayout
+                android:id="@+id/quadro_local"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="@drawable/fundo_quadro_local_padrao"
+                android:clickable="true"
+                android:focusable="true">
+
+                <org.webrtc.SurfaceViewRenderer
+                    android:id="@+id/video_local"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone" />
+
+                <FrameLayout
+                    android:id="@+id/container_avatar_local"
+                    android:layout_width="86dp"
+                    android:layout_height="86dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/fundo_avatar_local">
+
+                    <ImageView
+                        android:id="@+id/imagem_avatar_local"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/texto_avatar_local"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:text="V"
+                        android:textColor="@color/cor_ao_vivo"
+                        android:textSize="28sp"
+                        android:textStyle="bold" />
+                </FrameLayout>
+
+                <TextView
+                    android:id="@+id/texto_rotulo_quadro_local"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|start"
+                    android:layout_margin="14dp"
+                    android:background="@drawable/fundo_rotulo_quadro"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:paddingHorizontal="10dp"
+                    android:paddingVertical="6dp"
+                    android:text="@string/rotulo_voce"
+                    android:textColor="@color/cor_texto"
+                    android:textSize="12sp" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <!-- Barra Inferior de Controles (Controls Dock) -->
+        <LinearLayout
+            android:id="@+id/barra_controles"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="14dp"
+            android:background="@drawable/fundo_barra_controles"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:padding="6dp">
+
+            <!-- Microfone -->
+            <LinearLayout
+                android:id="@+id/botao_mudo"
+                android:layout_width="64dp"
+                android:layout_height="wrap_content"
+                android:background="@drawable/fundo_botao_dock_inativo"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingVertical="10dp">
+
+                <ImageView
+                    android:id="@+id/icone_mudo"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_mic_ligado" />
+
+                <TextView
+                    android:id="@+id/rotulo_mudo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:text="@string/controle_microfone"
+                    android:textColor="@color/cor_texto_secundario"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
+            <!-- Câmera -->
+            <LinearLayout
+                android:id="@+id/botao_camera"
+                android:layout_width="64dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:background="@drawable/fundo_botao_dock_inativo"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingVertical="10dp">
+
+                <ImageView
+                    android:id="@+id/icone_camera"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_cam_desligada" />
+
+                <TextView
+                    android:id="@+id/rotulo_camera"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:text="@string/controle_camera"
+                    android:textColor="@color/cor_texto_secundario"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
+            <!-- Tela -->
+            <LinearLayout
+                android:id="@+id/botao_compartilhar"
+                android:layout_width="60dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:background="@drawable/fundo_botao_dock_inativo"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingVertical="10dp">
+
+                <ImageView
+                    android:id="@+id/icone_compartilhar"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_compartilhar_tela" />
+
+                <TextView
+                    android:id="@+id/rotulo_compartilhar"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:text="@string/controle_tela"
+                    android:textColor="@color/cor_texto_secundario"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
+            <!-- Ouvir / Deafen -->
+            <LinearLayout
+                android:id="@+id/botao_ouvir"
+                android:layout_width="64dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:background="@drawable/fundo_botao_dock_inativo"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingVertical="10dp">
+
+                <ImageView
+                    android:id="@+id/icone_ouvir"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_ouvir_ligado" />
+
+                <TextView
+                    android:id="@+id/rotulo_ouvir"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:text="@string/controle_ouvir"
+                    android:textColor="@color/cor_texto_secundario"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="34dp"
+                android:layout_marginHorizontal="4dp"
+                android:background="@color/cor_borda_suave" />
+
+            <!-- Sair -->
+            <LinearLayout
+                android:id="@+id/botao_sair"
+                android:layout_width="60dp"
+                android:layout_height="wrap_content"
+                android:background="@drawable/fundo_botao_dock_inativo"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingVertical="10dp">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_sair_chamada" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:text="@string/controle_sair"
+                    android:textColor="@color/cor_perigo_suave"
+                    android:textSize="10sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ===================== MODAIS ===================== -->
+    <include layout="@layout/modal_perfil" />
+    <include layout="@layout/modal_compartilhar" />
+    <include layout="@layout/modal_configuracoes" />
+
+    <!-- ===================== TOAST GLOBAL ===================== -->
     <TextView
+        android:id="@+id/texto_toast"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Hello World!"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginHorizontal="24dp"
+        android:layout_marginBottom="24dp"
+        android:background="@drawable/fundo_toast_info"
+        android:elevation="24dp"
+        android:gravity="center"
+        android:paddingHorizontal="20dp"
+        android:paddingVertical="13dp"
+        android:textColor="@color/cor_texto"
+        android:textSize="13sp"
+        android:visibility="gone" />
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+</FrameLayout>

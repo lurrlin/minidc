@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/overlay_modal_configuracoes"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/cor_overlay_modal"
+    android:clickable="true"
+    android:focusable="true"
+    android:padding="20dp"
+    android:visibility="gone">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center">
+
+        <LinearLayout
+            android:id="@+id/card_modal_configuracoes"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/fundo_modal_card"
+            android:clickable="true"
+            android:focusable="true"
+            android:orientation="vertical"
+            android:padding="24dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/configuracoes_titulo"
+                    android:textColor="@color/cor_texto"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/botao_fechar_configuracoes"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="@drawable/fundo_botao_cabecalho"
+                    android:contentDescription="Fechar"
+                    android:gravity="center"
+                    android:text="×"
+                    android:textColor="@color/cor_texto_secundario"
+                    android:textSize="20sp" />
+            </LinearLayout>
+
+            <!-- Microfone -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:text="@string/configuracoes_microfone"
+                android:textColor="@color/cor_texto_secundario"
+                android:textSize="12sp" />
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/fundo_menu_contexto">
+
+                <Spinner
+                    android:id="@+id/seletor_microfone"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:popupBackground="@color/cor_superficie_2" />
+            </FrameLayout>
+
+            <!-- Saída de áudio -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/configuracoes_saida_audio"
+                android:textColor="@color/cor_texto_secundario"
+                android:textSize="12sp" />
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/fundo_menu_contexto">
+
+                <Spinner
+                    android:id="@+id/seletor_saida_audio"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:popupBackground="@color/cor_superficie_2" />
+            </FrameLayout>
+
+            <!-- Volume de entrada -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/configuracoes_volume_entrada"
+                    android:textColor="@color/cor_texto_secundario"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/texto_valor_volume_entrada"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="100%"
+                    android:textColor="@color/cor_destaque"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <SeekBar
+                android:id="@+id/barra_volume_entrada"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:max="200"
+                android:progress="100"
+                android:progressBackgroundTint="@color/cor_borda"
+                android:progressTint="@color/cor_destaque"
+                android:thumbTint="@color/cor_destaque" />
+
+            <!-- Volume geral de saída -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/configuracoes_volume_saida"
+                    android:textColor="@color/cor_texto_secundario"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/texto_valor_volume_saida"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="100%"
+                    android:textColor="@color/cor_destaque"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <SeekBar
+                android:id="@+id/barra_volume_saida"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:max="200"
+                android:progress="100"
+                android:progressBackgroundTint="@color/cor_borda"
+                android:progressTint="@color/cor_destaque"
+                android:thumbTint="@color/cor_destaque" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="16dp"
+                android:background="@color/cor_borda" />
+
+            <!-- Redução de ruído -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <CheckBox
+                    android:id="@+id/caixa_reducao_ruido"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:buttonTint="@color/cor_destaque"
+                    android:checked="true"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
+                    android:text="@string/configuracoes_reducao_ruido"
+                    android:textColor="@color/cor_texto_secundario"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/texto_estado_reducao_ruido"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/estado_ativo"
+                    android:textColor="@color/cor_ao_vivo"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <!-- Cancelamento de eco -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <CheckBox
+                    android:id="@+id/caixa_cancelamento_eco"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:buttonTint="@color/cor_destaque"
+                    android:checked="true"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
+                    android:text="@string/configuracoes_cancelamento_eco"
+                    android:textColor="@color/cor_texto_secundario"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/texto_estado_cancelamento_eco"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/estado_ativo"
+                    android:textColor="@color/cor_ao_vivo"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <!-- Ganho automático -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <CheckBox
+                    android:id="@+id/caixa_ganho_automatico"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:buttonTint="@color/cor_destaque"
+                    android:checked="true"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
+                    android:text="@string/configuracoes_ganho_automatico"
+                    android:textColor="@color/cor_texto_secundario"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/texto_estado_ganho_automatico"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/estado_ativo"
+                    android:textColor="@color/cor_ao_vivo"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/texto_status_processamento_audio"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:textColor="@color/cor_texto_secundario"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </ScrollView>
+</FrameLayout>
