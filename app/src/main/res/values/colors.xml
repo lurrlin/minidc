@@ -2,4 +2,39 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Paleta Unme — um espaço tranquilo a dois -->
+    <color name="cor_fundo">#FF10121B</color>
+    <color name="cor_superficie">#FF1A1D2A</color>
+    <color name="cor_superficie_card_lobby">#EE1A1D2A</color>
+    <color name="cor_superficie_2">#FF232737</color>
+    <color name="cor_borda">#FF363B50</color>
+    <color name="cor_borda_suave">#FF2B3043</color>
+    <color name="cor_texto">#FFF5F2EB</color>
+    <color name="cor_texto_secundario">#FFB0B5C8</color>
+    <color name="cor_texto_apagado">#FF858DA8</color>
+    <color name="cor_destaque">#FFC4B4F7</color>
+    <color name="cor_destaque_suave">#FFDFD4FF</color>
+    <color name="cor_destaque_tinta">#FF29203E</color>
+    <color name="cor_destaque_fundo_ativo">#22C4B4F7</color>
+    <color name="cor_ao_vivo">#FF8DD5B8</color>
+    <color name="cor_ao_vivo_brilho">#228DD5B8</color>
+    <color name="cor_perigo">#FFB64B62</color>
+    <color name="cor_perigo_suave">#FFFFAFBD</color>
+    <color name="cor_perigo_fundo_ativo">#33B64B62</color>
+
+    <!-- Avatares e quadros de vídeo -->
+    <color name="cor_avatar_remoto_fundo">#FF3D3455</color>
+    <color name="cor_avatar_local_fundo">#FF284239</color>
+    <color name="cor_arte_pessoa">#FF39324E</color>
+    <color name="cor_arte_pessoa_borda">#FF5B4B7B</color>
+    <color name="cor_arte_outra">#FF243E3A</color>
+    <color name="cor_arte_outra_borda">#FF40675A</color>
+    <color name="cor_quadro_inicio">#FF222636</color>
+    <color name="cor_quadro_local_inicio">#FF252332</color>
+    <color name="cor_quadro_fim">#FF191C29</color>
+    <color name="cor_rotulo_quadro_fundo">#BA10121B</color>
+    <color name="cor_botao_acao_borda">#22FFFFFF</color>
+    <color name="cor_overlay_modal">#BB090B13</color>
+    <color name="cor_fundo_tela_compartilhada">#FF0C0E15</color>
 </resources>

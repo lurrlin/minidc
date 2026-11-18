@@ -36,7 +36,12 @@ dependencies {
     implementation(libs.appcompat)
     implementation(libs.constraintlayout)
     implementation(libs.material)
+    implementation(libs.stream.webrtc.android)
+    implementation(libs.socketio.client) {
+        exclude(group = "org.json", module = "json")
+    }
     testImplementation(libs.junit)
+    testImplementation(libs.org.json)
     androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.ext.junit)
 }

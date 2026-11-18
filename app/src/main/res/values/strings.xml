@@ -1,3 +1,82 @@
 <resources>
     <string name="app_name">Unme</string>
+
+    <!-- Lobby -->
+    <string name="marca_simbolo">ü</string>
+    <string name="marca_nome">unme</string>
+    <string name="marca_legenda">SEU ESPAÇO A DOIS</string>
+    <string name="lobby_selo_ao_vivo">Perto, mesmo de longe</string>
+    <string name="lobby_titulo_intro">Uma conversa.\nDois mundos.</string>
+    <string name="lobby_titulo_intro_destaque">O mesmo lugar.</string>
+    <string name="lobby_descricao_intro">Compartilhe a tela, a voz e aquele momento.\nUm espaço tranquilo, só para vocês.</string>
+    <string name="lobby_recurso_voz">• Voz &amp; vídeo</string>
+    <string name="lobby_recurso_tela">• Tela compartilhada</string>
+    <string name="lobby_recurso_dois">• Só vocês dois</string>
+    <string name="lobby_comece_aqui">COMECE POR AQUI</string>
+    <string name="lobby_card_titulo">Vamos nos encontrar?</string>
+    <string name="lobby_card_subtitulo">Crie um espaço e envie o código para sua pessoa.</string>
+    <string name="botao_criar_sala">Criar sala</string>
+    <string name="botao_mostrar_entrar">Entrar em uma sala</string>
+    <string name="dica_codigo_sala">Cole o código da sala</string>
+    <string name="botao_entrar_sala">Entrar na sala</string>
+    <string name="botao_voltar">Voltar</string>
+    <string name="rotulo_codigo_sala">Código da sala</string>
+    <string name="botao_copiar">Copiar</string>
+    <string name="perfil_padrao_lobby">Seu perfil</string>
+    <string name="perfil_editar_subtitulo">Editar nome e foto</string>
+
+    <!-- Perfil -->
+    <string name="perfil_titulo">Seu perfil</string>
+    <string name="perfil_descricao">Sua companhia verá esse nome e essa foto na chamada.</string>
+    <string name="botao_escolher_foto">Escolher foto</string>
+    <string name="botao_remover_foto">Remover foto</string>
+    <string name="rotulo_nome_perfil">Como você quer ser chamado?</string>
+    <string name="dica_nome_perfil">Seu nome</string>
+    <string name="perfil_status_padrao">Salvo apenas neste dispositivo.</string>
+    <string name="perfil_status_preparando">Preparando sua foto…</string>
+    <string name="perfil_status_pronta">Foto pronta. Salve para confirmar.</string>
+    <string name="botao_salvar_perfil">Salvar perfil</string>
+
+    <!-- Chamada -->
+    <string name="status_conectando">conectando...</string>
+    <string name="status_conectado">conectado</string>
+    <string name="status_conexao_instavel">conexao instavel - tentando reconectar...</string>
+    <string name="status_esperando_voltar">esperando a outra pessoa voltar...</string>
+    <string name="vazio_remoto_inicial">Envie o código e espere sua companhia.</string>
+    <string name="vazio_remoto_camera_desligada">Câmera desligada. A conversa continua.</string>
+    <string name="vazio_remoto_voltando">Esperando sua companhia voltar…</string>
+    <string name="rotulo_sua_companhia">Sua companhia</string>
+    <string name="rotulo_voce">Você</string>
+    <string name="rotulo_sua_tela">Sua tela</string>
+    <string name="botao_tela_cheia">Tela cheia</string>
+    <string name="botao_sair_tela_cheia">Sair da tela cheia</string>
+    <string name="rotulo_voz_pessoa">Voz da pessoa</string>
+    <string name="rotulo_audio_transmissao">Áudio da transmissão</string>
+
+    <!-- Controles da barra inferior -->
+    <string name="controle_microfone">Microfone</string>
+    <string name="controle_camera">Câmera</string>
+    <string name="controle_tela">Tela</string>
+    <string name="controle_ouvir">Ouvir</string>
+    <string name="controle_silenciado">Silenciado</string>
+    <string name="controle_sair">Sair</string>
+
+    <!-- Compartilhamento de tela -->
+    <string name="compartilhar_titulo">O que vamos compartilhar?</string>
+    <string name="compartilhar_incluir_audio">Incluir áudio da tela ou janela</string>
+    <string name="compartilhar_fonte_tela_inteira">Tela inteira do aparelho</string>
+    <string name="compartilhar_parar">Parar compartilhamento</string>
+
+    <!-- Configurações -->
+    <string name="configuracoes_titulo">Configurações</string>
+    <string name="configuracoes_microfone">Microfone</string>
+    <string name="configuracoes_saida_audio">Saída de áudio</string>
+    <string name="configuracoes_volume_entrada">Volume de entrada</string>
+    <string name="configuracoes_volume_saida">Volume geral de saída</string>
+    <string name="configuracoes_reducao_ruido">Redução de ruído</string>
+    <string name="configuracoes_cancelamento_eco">Cancelamento de eco</string>
+    <string name="configuracoes_ganho_automatico">Ganho automático</string>
+    <string name="estado_ativo">Ativo</string>
+    <string name="estado_desligado">Desligado</string>
+    <string name="estado_indisponivel">Indisponível</string>
 </resources>
