@@ -1196,17 +1196,25 @@
       return;
     }
 
-    sourceGrid.innerHTML = '';
+    sourceGrid.replaceChildren();
     includeSystemAudio.checked = Boolean(screenAudioTrack);
     stopScreenShareButton.hidden = !screenStream;
     sources.forEach((source) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'source-option';
-      btn.innerHTML = `
-        <img src="${source.thumbnailDataUrl}" alt="" />
-        <span class="source-option-name">${escapeHtml(source.name)}</span>
-      `;
+
+      const img = document.createElement('img');
+      img.alt = '';
+      if (typeof source.thumbnailDataUrl === 'string' && source.thumbnailDataUrl.startsWith('data:image/')) {
+        img.src = source.thumbnailDataUrl;
+      }
+
+      const nameEl = document.createElement('span');
+      nameEl.className = 'source-option-name';
+      nameEl.textContent = source.name || '';
+
+      btn.append(img, nameEl);
       btn.addEventListener('click', () => {
         closeSourcePicker();
         startScreenShare(source.id, includeSystemAudio.checked, source.nativeAudioPid);
@@ -1219,7 +1227,7 @@
 
   function closeSourcePicker() {
     sourceModal.hidden = true;
-    sourceGrid.innerHTML = '';
+    sourceGrid.replaceChildren();
   }
 
   sourceModalClose.addEventListener('click', closeSourcePicker);
@@ -1547,12 +1555,6 @@
       showToast('Nao foi possivel copiar o codigo.', 'error');
     }
   });
-
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-  }
 
   // Permissoes de camera/microfone no macOS (no-op no Windows).
   window.electronAPI.checkMediaPermissions().catch(() => {});
