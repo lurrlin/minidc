@@ -199,6 +199,7 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
     private Runnable temporizadorReconexao;
     private Runnable temporizadorFalhaIce;
     private long ultimoPedidoReinicioIceMs = 0L;
+    private volatile boolean focoAudioPerdidoTemporariamente = false;
 
     public MotorChamadaWebRtc(Context contexto, OuvinteInterfaceChamada ouvinteUi) {
         this.contextoApp = contexto.getApplicationContext();
@@ -215,6 +216,7 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
 
             @Override
             public void aoAlterarFocoAudio(boolean focoTemporariamentePerdido) {
+                focoAudioPerdidoTemporariamente = focoTemporariamentePerdido;
                 if (moduloAudio != null) {
                     moduloAudio.setSpeakerMute(
                             focoTemporariamentePerdido || misturadorAudio.estaSilenciadoTotal()
@@ -547,7 +549,7 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         faixaMicrofoneLocal.setEnabled(true);
         if (moduloAudio != null) {
             moduloAudio.setMicrophoneMute(false);
-            moduloAudio.setSpeakerMute(misturadorAudio.estaSilenciadoTotal());
+            moduloAudio.setSpeakerMute(focoAudioPerdidoTemporariamente || misturadorAudio.estaSilenciadoTotal());
         }
         cameraAtiva = false;
     }
@@ -622,7 +624,7 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
     }
 
     public void aplicarVolumesRemotos() {
-        boolean silenciado = misturadorAudio.estaSilenciadoTotal();
+        boolean silenciado = focoAudioPerdidoTemporariamente || misturadorAudio.estaSilenciadoTotal();
         if (moduloAudio != null) {
             moduloAudio.setSpeakerMute(silenciado);
         }
@@ -1591,7 +1593,9 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
                 reprodutorAudioTelaRemota.play();
             }
 
-            double ganho = misturadorAudio.obterGanhoEfetivoCanal(MisturadorAudio.CANAL_TELA);
+            double ganho = focoAudioPerdidoTemporariamente
+                    ? 0.0
+                    : misturadorAudio.obterGanhoEfetivoCanal(MisturadorAudio.CANAL_TELA);
             short[] amostrasSaida = pacote.amostras;
             if (ganho <= 0.00001) {
                 java.util.Arrays.fill(amostrasSaida, (short) 0);
@@ -2186,6 +2190,7 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
             fonteMicrofoneLocal = null;
         }
         microfoneHabilitado = true;
+        focoAudioPerdidoTemporariamente = false;
         if (moduloAudio != null) {
             moduloAudio.setMicrophoneMute(false);
             moduloAudio.setSpeakerMute(false);
