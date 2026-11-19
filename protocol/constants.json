@@ -59,8 +59,8 @@
   },
   "media": {
     "transceiverOrder": [
-      "audio:voice",
       "video:primary",
+      "audio:voice",
       "audio:screen"
     ],
     "audio": {

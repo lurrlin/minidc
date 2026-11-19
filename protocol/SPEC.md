@@ -120,8 +120,8 @@ A conexão sempre negocia **3 m-lines `sendrecv`** em `UNIFIED_PLAN` nesta ordem
 
 | Índice | Tipo | Papel Lógico | Troca dinâmica |
 | :---: | :--- | :--- | :--- |
-| `0` | `audio` (`audio[0]`) | **Voz do microfone** (`voice`) | `replaceTrack`/`setTrack` ao trocar mic ou aplicar processamento |
-| `1` | `video` (`video[0]`) | **Câmera ou Tela** (`video`) | `replaceTrack`/`setTrack` (`cameraTrack` ↔ `screenTrack` ↔ `null`) sem renegociar SDP |
+| `0` | `video` (`video[0]`) | **Câmera ou Tela** (`video`) | `replaceTrack`/`setTrack` (`cameraTrack` ↔ `screenTrack` ↔ `null`) sem renegociar SDP |
+| `1` | `audio` (`audio[0]`) | **Voz do microfone** (`voice`) | `replaceTrack`/`setTrack` ao trocar mic ou aplicar processamento |
 | `2` | `audio` (`audio[1]`) | **Áudio da tela** (`screen`) | `replaceTrack`/`setTrack` (usado nativamente no Desktop) |
 
 - **Regra obrigatória no receptor:** distinguir `voice` de `screen` pela posição do transceiver de áudio na lista ordenada da conexão (ou pelo `mid` registrado do primeiro transceiver de áudio), **nunca** por comparação de referência de objeto wrapper.
