@@ -54,6 +54,43 @@ function validRoomName(value) {
 
 const roomKey = (name) => `call:${name}`;
 const signalTypes = new Set(['offer', 'answer', 'candidate', 'ready', 'screen-share-start', 'screen-share-stop', 'video-state', 'renegotiate']);
+const LIMITES_TAXA = {
+  'check-room': { janelaMs: 30000, maxPorSocket: 12, maxPorIp: 60 },
+  'join-room': { janelaMs: 30000, maxPorSocket: 10, maxPorIp: 40 },
+  signal: { janelaMs: 10000, maxPorSocket: 200 },
+};
+const bucketsPorIp = new Map();
+
+function obterIpSocket(socket) {
+  const encaminhado = socket.handshake?.headers?.['x-forwarded-for'];
+  if (typeof encaminhado === 'string' && encaminhado.trim()) {
+    return encaminhado.split(',')[0].trim();
+  }
+  return socket.handshake?.address || 'desconhecido';
+}
+
+function consumirLimiteJanela(tabela, chave, janelaMs, maximo, agora) {
+  let entrada = tabela.get(chave);
+  if (!entrada || agora - entrada.inicioJanela >= janelaMs) {
+    entrada = { inicioJanela: agora, contagem: 1 };
+    tabela.set(chave, entrada);
+    return true;
+  }
+  if (entrada.contagem >= maximo) {
+    return false;
+  }
+  entrada.contagem += 1;
+  return true;
+}
+
+function limparBucketsExpirados(agora) {
+  if (bucketsPorIp.size <= 1000) return;
+  for (const [chave, entrada] of bucketsPorIp.entries()) {
+    if (agora - entrada.inicioJanela >= 60000) {
+      bucketsPorIp.delete(chave);
+    }
+  }
+}
 
 app.get('/', (_req, res) => {
   res.send('Mini Discord signaling server - online.');
@@ -71,8 +108,30 @@ app.get('/health', (_req, res) => {
 io.on('connection', (socket) => {
   console.log(`[connect] ${socket.id}`);
   let currentRoom = null;
+  const bucketsSocket = new Map();
+  const ipCliente = obterIpSocket(socket);
+
+  function dentroDoLimite(evento) {
+    const regra = LIMITES_TAXA[evento];
+    if (!regra) return true;
+    const agora = Date.now();
+    if (!consumirLimiteJanela(bucketsSocket, evento, regra.janelaMs, regra.maxPorSocket, agora)) {
+      return false;
+    }
+    if (regra.maxPorIp) {
+      limparBucketsExpirados(agora);
+      if (!consumirLimiteJanela(bucketsPorIp, `${evento}:${ipCliente}`, regra.janelaMs, regra.maxPorIp, agora)) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   socket.on('join-room', (roomNameRaw) => {
+    if (!dentroDoLimite('join-room')) {
+      socket.emit('join-error', 'Muitas tentativas em sequencia. Aguarde alguns segundos.');
+      return;
+    }
     if (!validRoomName(roomNameRaw)) {
       socket.emit('join-error', 'Nome de sala invalido.');
       return;
@@ -110,6 +169,14 @@ io.on('connection', (socket) => {
 
   socket.on('check-room', (roomNameRaw) => {
     const roomName = validRoomName(roomNameRaw) ? roomNameRaw.trim() : '';
+    if (!dentroDoLimite('check-room')) {
+      socket.emit('room-check-result', {
+        roomName,
+        exists: false,
+        available: false,
+      });
+      return;
+    }
     const size = roomSize(roomName);
     socket.emit('room-check-result', {
       roomName,
@@ -122,6 +189,7 @@ io.on('connection', (socket) => {
   // para o outro peer da mesma sala. O "shape" do payload e definido pelo
   // cliente (renderer.js); o servidor so encaminha, sem inspecionar.
   socket.on('signal', (payload) => {
+    if (!dentroDoLimite('signal')) return;
     if (!payload || typeof payload !== 'object') return;
     const { roomName, data } = payload;
     if (!currentRoom || roomName !== currentRoom || !data || !signalTypes.has(data.type)) return;
@@ -130,7 +198,10 @@ io.on('connection', (socket) => {
   });
 
   socket.on('leave-room', () => cleanup('leave-room event'));
-  socket.on('disconnect', () => cleanup('disconnect'));
+  socket.on('disconnect', () => {
+    bucketsSocket.clear();
+    cleanup('disconnect');
+  });
 
   function cleanup(reason) {
     if (!currentRoom) return;
