@@ -94,6 +94,7 @@
   let iceFailureTimer = null;
   let renegotiationQueued = false;
   let renegotiationInProgress = false;
+  let lastIceRestartRequestAt = 0;
   let toastTimer = null;
   let reconnectTimer = null;
   let roomCheckResolver = null;
@@ -700,9 +701,25 @@
     });
 
     window.electronAPI.socketOn('joined-room', async ({ roomName, isFirstPeer }) => {
-      if (hasJoinedOnce && pc) {
-        pc.close();
-        pc = null;
+      if (hasJoinedOnce) {
+        await remoteMixer?.close();
+        remoteMixer = null;
+        remotePeerReady = false;
+        pendingPeerJoined = false;
+        pendingSignals = [];
+        pendingCandidates = [];
+        processingSignals = false;
+        renegotiationQueued = false;
+        renegotiationInProgress = false;
+        lastIceRestartRequestAt = 0;
+        remoteProfile = { name: '', photo: '' };
+        profileChannel = null;
+        screenAudioChannel = null;
+        remoteVideoEnabled = null;
+        if (pc) {
+          pc.close();
+          pc = null;
+        }
       }
       currentRoom = roomName;
       isInitiator = isFirstPeer;
@@ -807,7 +824,8 @@
           remoteVideoEnabled = Boolean(data.enabled);
           remoteTile.classList.toggle('has-video', remoteVideoEnabled);
         } else if (data.type === 'renegotiate' && isInitiator) {
-          await renegotiateConnection();
+          if (data.iceRestart) await attemptIceRestart(true);
+          else await renegotiateConnection();
         }
       } catch (err) {
         console.error('Erro processando sinal:', data.type, err);
@@ -832,6 +850,7 @@
       renderProfiles();
       remoteVideoEnabled = null;
       pendingSignals = [];
+      lastIceRestartRequestAt = 0;
       setConnectionState('connecting');
       callStatus.textContent = 'esperando a outra pessoa voltar...';
       // Mantemos nossa PeerConnection e midia local de pe: quando ela
@@ -998,9 +1017,16 @@
     return pc;
   }
 
-  async function attemptIceRestart() {
-    if (!pc || !isInitiator) return; // so quem criou a offer original reinicia o ICE
-    if (pc.connectionState === 'connected') return;
+  async function attemptIceRestart(forceEvenIfConnected = false) {
+    if (!pc) return;
+    if (!forceEvenIfConnected && pc.connectionState === 'connected') return;
+    if (!isInitiator) {
+      const now = Date.now();
+      if (now - lastIceRestartRequestAt < 2000) return;
+      lastIceRestartRequestAt = now;
+      sendSignal({ type: 'renegotiate', iceRestart: true });
+      return;
+    }
     try {
       const offer = await pc.createOffer({ iceRestart: true });
       await pc.setLocalDescription(offer);
@@ -1374,6 +1400,7 @@
     clearTimeout(iceFailureTimer);
     renegotiationQueued = false;
     renegotiationInProgress = false;
+    lastIceRestartRequestAt = 0;
     microphoneSender = null;
     remoteVideo.srcObject = null;
     remoteVideo.dataset.empty = 'true';
