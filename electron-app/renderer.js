@@ -504,9 +504,11 @@
         video: { width: { ideal: 1280 }, height: { ideal: 720 } },
       });
       cameraTrack = cameraStream.getVideoTracks()[0];
+      if ('contentHint' in cameraTrack) cameraTrack.contentHint = 'motion';
       localStream.addTrack(cameraTrack);
       if (!screenStream) {
         await videoTransceiver.sender.replaceTrack(cameraTrack);
+        await aplicarParametrosEnvioVideo(videoTransceiver.sender, false);
         localVideo.srcObject = localStream;
       }
       localTile.classList.add('has-video', 'video-square');
@@ -844,6 +846,28 @@
     microphoneSender = channels.microphoneSender;
     videoTransceiver = channels.videoTransceiver;
     screenAudioTransceiver = channels.screenAudioTransceiver;
+    if (screenStream || cameraTrack) {
+      await aplicarParametrosEnvioVideo(videoTransceiver?.sender, Boolean(screenStream));
+    }
+  }
+
+  async function aplicarParametrosEnvioVideo(sender, modoTela) {
+    if (!sender || typeof sender.getParameters !== 'function' || typeof sender.setParameters !== 'function') {
+      return;
+    }
+    try {
+      const parametros = sender.getParameters();
+      if (!parametros || !Array.isArray(parametros.encodings) || !parametros.encodings.length) return;
+      parametros.degradationPreference = modoTela ? 'maintain-resolution' : 'balanced';
+      const maxBitrate = modoTela ? 2500000 : 1500000;
+      for (const encoding of parametros.encodings) {
+        encoding.maxBitrate = maxBitrate;
+        encoding.maxFramerate = 30;
+      }
+      await sender.setParameters(parametros);
+    } catch (erro) {
+      console.warn('Não foi possível aplicar parâmetros de vídeo:', erro?.message || erro);
+    }
   }
 
   async function createPeerConnection() {
@@ -1171,6 +1195,7 @@
     }
 
     const screenTrack = screenStream.getVideoTracks()[0];
+    if ('contentHint' in screenTrack) screenTrack.contentHint = 'detail';
     await stopNativeAudioCapture();
     if (useNativeAudio) {
       try {
@@ -1199,7 +1224,10 @@
     // sem precisar renegociar a offer/answer.
     const sender = pc && (videoTransceiver?.sender || pc.getSenders().find((s) => s.track?.kind === 'video'));
     try {
-      if (sender) await sender.replaceTrack(screenTrack);
+      if (sender) {
+        await sender.replaceTrack(screenTrack);
+        await aplicarParametrosEnvioVideo(sender, true);
+      }
     } catch (error) {
       nextScreenStream.getTracks().forEach((track) => track.stop());
       await stopNativeAudioCapture();
@@ -1259,7 +1287,10 @@
     screenAudioTrack = null;
 
     const sender = pc && (videoTransceiver?.sender || pc.getSenders().find((s) => s.track?.kind === 'video'));
-    if (sender) await sender.replaceTrack(cameraTrack || null);
+    if (sender) {
+      await sender.replaceTrack(cameraTrack || null);
+      if (cameraTrack) await aplicarParametrosEnvioVideo(sender, false);
+    }
 
     localVideo.srcObject = localStream;
     localTile.classList.remove('screen-share');
