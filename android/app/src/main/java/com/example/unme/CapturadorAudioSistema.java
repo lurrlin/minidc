@@ -13,29 +13,25 @@ import java.nio.ByteOrder;
 
 public class CapturadorAudioSistema {
 
+    public interface OuvinteQuadroAudioSistema {
+        void aoCapturarQuadro(short[] amostrasPcm, int quantidadeAmostras, int taxaAmostragem);
+    }
+
     private AudioRecord gravadorSistema;
     private Thread threadCaptura;
     private volatile boolean capturando = false;
-    private final Object travaBuffer = new Object();
-    private byte[] bufferCircular;
-    private int cabecaLeitura = 0;
-    private int caudaEscrita = 0;
-    private int bytesDisponiveis = 0;
-    private int taxaAtual = 48000;
-    private int canaisAtuais = 1;
+    private OuvinteQuadroAudioSistema ouvinteQuadro;
+    private int taxaAtual = CodecAdpcm.TAXA_AMOSTRAGEM_PADRAO_HZ;
 
     @SuppressLint("MissingPermission")
-    public boolean iniciar(MediaProjection projecaoMidia, int taxaAmostragem, int quantidadeCanais) {
+    public boolean iniciar(MediaProjection projecaoMidia, OuvinteQuadroAudioSistema ouvinte) {
         parar();
-        if (projecaoMidia == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+        if (projecaoMidia == null || ouvinte == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             return false;
         }
 
-        this.taxaAtual = taxaAmostragem > 0 ? taxaAmostragem : 48000;
-        this.canaisAtuais = quantidadeCanais == 2 ? 2 : 1;
-        int mascaraCanais = canaisAtuais == 2
-                ? AudioFormat.CHANNEL_IN_STEREO
-                : AudioFormat.CHANNEL_IN_MONO;
+        this.ouvinteQuadro = ouvinte;
+        this.taxaAtual = CodecAdpcm.TAXA_AMOSTRAGEM_PADRAO_HZ;
 
         try {
             AudioPlaybackCaptureConfiguration configuracaoCaptura =
@@ -48,18 +44,18 @@ public class CapturadorAudioSistema {
             AudioFormat formatoAudio = new AudioFormat.Builder()
                     .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
                     .setSampleRate(taxaAtual)
-                    .setChannelMask(mascaraCanais)
+                    .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
                     .build();
 
             int tamanhoMinimo = AudioRecord.getMinBufferSize(
                     taxaAtual,
-                    mascaraCanais,
+                    AudioFormat.CHANNEL_IN_MONO,
                     AudioFormat.ENCODING_PCM_16BIT
             );
             if (tamanhoMinimo <= 0) {
-                tamanhoMinimo = taxaAtual * canaisAtuais * 2 / 10;
+                tamanhoMinimo = CodecAdpcm.AMOSTRAS_POR_QUADRO_20MS * 4;
             }
-            int tamanhoBufferGravador = Math.max(tamanhoMinimo * 2, 8192);
+            int tamanhoBufferGravador = Math.max(tamanhoMinimo * 2, 4096);
 
             gravadorSistema = new AudioRecord.Builder()
                     .setAudioFormat(formatoAudio)
@@ -71,13 +67,6 @@ public class CapturadorAudioSistema {
                 gravadorSistema.release();
                 gravadorSistema = null;
                 return false;
-            }
-
-            synchronized (travaBuffer) {
-                bufferCircular = new byte[taxaAtual * canaisAtuais * 2]; // 1 segundo de janela máxima
-                cabecaLeitura = 0;
-                caudaEscrita = 0;
-                bytesDisponiveis = 0;
             }
 
             capturando = true;
@@ -92,75 +81,36 @@ public class CapturadorAudioSistema {
     }
 
     private void executarLoopCaptura() {
-        byte[] blocoLeitura = new byte[1920];
+        final int bytesPorQuadro = CodecAdpcm.AMOSTRAS_POR_QUADRO_20MS * 2;
+        byte[] blocoBytes = new byte[bytesPorQuadro];
+        short[] amostras = new short[CodecAdpcm.AMOSTRAS_POR_QUADRO_20MS];
+
         while (capturando && gravadorSistema != null) {
-            int lidos;
-            try {
-                lidos = gravadorSistema.read(blocoLeitura, 0, blocoLeitura.length);
-            } catch (Throwable erro) {
+            int acumulado = 0;
+            while (acumulado < bytesPorQuadro && capturando && gravadorSistema != null) {
+                int lidos;
+                try {
+                    lidos = gravadorSistema.read(blocoBytes, acumulado, bytesPorQuadro - acumulado);
+                } catch (Throwable erro) {
+                    lidos = -1;
+                }
+                if (lidos <= 0) {
+                    break;
+                }
+                acumulado += lidos;
+            }
+
+            if (acumulado >= 2 && ouvinteQuadro != null) {
+                int totalAmostras = acumulado / 2;
+                ByteBuffer.wrap(blocoBytes, 0, totalAmostras * 2)
+                        .order(ByteOrder.LITTLE_ENDIAN)
+                        .asShortBuffer()
+                        .get(amostras, 0, totalAmostras);
+                ouvinteQuadro.aoCapturarQuadro(amostras, totalAmostras, taxaAtual);
+            } else if (acumulado <= 0) {
                 break;
             }
-            if (lidos > 0) {
-                escreverNoBuffer(blocoLeitura, lidos);
-            }
         }
-    }
-
-    private void escreverNoBuffer(byte[] dados, int quantidade) {
-        synchronized (travaBuffer) {
-            if (bufferCircular == null || bufferCircular.length == 0) {
-                return;
-            }
-            int capacidade = bufferCircular.length;
-            for (int i = 0; i < quantidade; i++) {
-                bufferCircular[caudaEscrita] = dados[i];
-                caudaEscrita = (caudaEscrita + 1) % capacidade;
-                if (bytesDisponiveis < capacidade) {
-                    bytesDisponiveis++;
-                } else {
-                    cabecaLeitura = (cabecaLeitura + 1) % capacidade;
-                }
-            }
-        }
-    }
-
-    public void misturarNoBufferGravado(ByteBuffer bufferDestino, int quantidadeBytes) {
-        if (!capturando || bufferDestino == null || quantidadeBytes <= 1) {
-            return;
-        }
-        byte[] temporario = new byte[quantidadeBytes];
-        int lidos = 0;
-        synchronized (travaBuffer) {
-            if (bytesDisponiveis < quantidadeBytes || bufferCircular == null) {
-                return;
-            }
-            int capacidade = bufferCircular.length;
-            while (lidos < quantidadeBytes) {
-                temporario[lidos++] = bufferCircular[cabecaLeitura];
-                cabecaLeitura = (cabecaLeitura + 1) % capacidade;
-                bytesDisponiveis--;
-            }
-        }
-
-        ByteOrder ordemOriginal = bufferDestino.order();
-        bufferDestino.order(ByteOrder.LITTLE_ENDIAN);
-        ByteBuffer bufferSistema = ByteBuffer.wrap(temporario).order(ByteOrder.LITTLE_ENDIAN);
-        int posicaoInicial = bufferDestino.position();
-        int totalAmostras = quantidadeBytes / 2;
-
-        for (int i = 0; i < totalAmostras; i++) {
-            int deslocamento = posicaoInicial + (i * 2);
-            short amostraVoz = bufferDestino.getShort(deslocamento);
-            short amostraSistema = bufferSistema.getShort(i * 2);
-            int soma = amostraVoz + amostraSistema;
-            if (soma > Short.MAX_VALUE) {
-                soma = Short.MAX_VALUE;
-            } else if (soma < Short.MIN_VALUE) {
-                soma = Short.MIN_VALUE;
-            }
-            bufferDestino.putShort(deslocamento, (short) soma);
-        }
-        bufferDestino.order(ordemOriginal);
     }
 
     public boolean estaCapturando() {
@@ -169,6 +119,7 @@ public class CapturadorAudioSistema {
 
     public void parar() {
         capturando = false;
+        ouvinteQuadro = null;
         Thread threadAntiga = threadCaptura;
         threadCaptura = null;
         if (gravadorSistema != null) {
@@ -188,12 +139,6 @@ public class CapturadorAudioSistema {
             } catch (InterruptedException ignorado) {
                 Thread.currentThread().interrupt();
             }
-        }
-        synchronized (travaBuffer) {
-            bufferCircular = null;
-            bytesDisponiveis = 0;
-            cabecaLeitura = 0;
-            caudaEscrita = 0;
         }
     }
 }

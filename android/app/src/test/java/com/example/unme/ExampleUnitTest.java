@@ -192,4 +192,38 @@ public class ExampleUnitTest {
         assertEquals(720, padrao[1]);
         assertEquals(30, padrao[2]);
     }
+
+    @Test
+    public void codecAdpcmCodificaEDecodificaPacoteDeAudioDaTela() {
+        short[] entrada = new short[CodecAdpcm.AMOSTRAS_POR_QUADRO_20MS];
+        for (int i = 0; i < entrada.length; i++) {
+            entrada[i] = (short) Math.round(Math.sin(i * 0.1) * 12000.0);
+        }
+        CodecAdpcm.EstadoCodificador estado = new CodecAdpcm.EstadoCodificador();
+        byte[] pacote = CodecAdpcm.codificar(
+                entrada,
+                entrada.length,
+                CodecAdpcm.TAXA_AMOSTRAGEM_PADRAO_HZ,
+                42,
+                estado
+        );
+        assertNotNull(pacote);
+        assertEquals(
+                CodecAdpcm.TAMANHO_CABECALHO_BYTES + (CodecAdpcm.AMOSTRAS_POR_QUADRO_20MS / 2),
+                pacote.length
+        );
+
+        CodecAdpcm.PacoteDecodificado decodificado = CodecAdpcm.decodificar(pacote);
+        assertNotNull(decodificado);
+        assertEquals(24000, decodificado.taxaAmostragem);
+        assertEquals(42, decodificado.sequencia);
+        assertEquals(entrada.length, decodificado.amostras.length);
+
+        long erroMedio = 0;
+        for (int i = 0; i < entrada.length; i++) {
+            erroMedio += Math.abs(entrada[i] - decodificado.amostras[i]);
+        }
+        assertTrue((erroMedio / (double) entrada.length) < 1000.0);
+        assertNull(CodecAdpcm.decodificar(new byte[]{1, 2, 3}));
+    }
 }

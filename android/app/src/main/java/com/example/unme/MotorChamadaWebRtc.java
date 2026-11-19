@@ -2,7 +2,9 @@ package com.example.unme;
 
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioAttributes;
 import android.media.AudioDeviceInfo;
+import android.media.AudioFormat;
 import android.media.audiofx.AcousticEchoCanceler;
 import android.media.audiofx.AutomaticGainControl;
 import android.media.audiofx.NoiseSuppressor;
@@ -150,6 +152,13 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
     private RtpTransceiver transceptorVideo;
     private RtpTransceiver transceptorAudioTela;
     private DataChannel canalPerfil;
+    private DataChannel canalAudioTela;
+
+    private final CodecAdpcm.EstadoCodificador estadoCodificadorAudioTela = new CodecAdpcm.EstadoCodificador();
+    private int sequenciaEnvioAudioTela = 0;
+    private int ultimaSequenciaAudioTelaRecebida = -1;
+    private android.media.AudioTrack reprodutorAudioTelaRemota;
+    private int taxaReprodutorAudioTela = 0;
 
     private VideoTrack faixaVideoRemotaAtual;
     private AudioTrack faixaVozRemota;
@@ -211,9 +220,6 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
                                 bytesRestantes,
                                 misturadorAudio.obterGanhoEntrada()
                         );
-                    }
-                    if (compartilhandoAudioTela && capturadorAudioSistema.estaCapturando()) {
-                        capturadorAudioSistema.misturarNoBufferGravado(bufferAudio, bytesRestantes);
                     }
                 })
                 .createAudioDeviceModule();
@@ -924,9 +930,30 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         compartilhandoTela = true;
 
         if (incluirAudio) {
+            estadoCodificadorAudioTela.reiniciar();
+            sequenciaEnvioAudioTela = 0;
             MediaProjection projecao = novoCapturador.getMediaProjection();
             boolean iniciouAudio = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
-                    && capturadorAudioSistema.iniciar(projecao, ultimaTaxaGravada, ultimosCanaisGravados);
+                    && capturadorAudioSistema.iniciar(projecao, (amostras, quantidade, taxa) -> {
+                DataChannel canal = canalAudioTela;
+                if (!compartilhandoAudioTela || canal == null || canal.state() != DataChannel.State.OPEN) {
+                    return;
+                }
+                int seq = sequenciaEnvioAudioTela++;
+                byte[] pacote = CodecAdpcm.codificar(
+                        amostras,
+                        quantidade,
+                        taxa,
+                        seq,
+                        estadoCodificadorAudioTela
+                );
+                if (pacote != null) {
+                    try {
+                        canal.send(new DataChannel.Buffer(ByteBuffer.wrap(pacote), true));
+                    } catch (Exception ignorado) {
+                    }
+                }
+            });
             compartilhandoAudioTela = iniciouAudio;
             if (!iniciouAudio) {
                 ouvinteUi.aoMostrarToast("A tela está sendo compartilhada sem áudio.", "info", 4000);
@@ -1188,6 +1215,8 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         transceptorVideo = null;
         transceptorAudioTela = null;
         canalPerfil = null;
+        canalAudioTela = null;
+        ultimaSequenciaAudioTelaRecebida = -1;
 
         List<PeerConnection.IceServer> servidoresIce = new ArrayList<>();
         for (String url : ConfiguracaoApp.SERVIDORES_ICE) {
@@ -1312,6 +1341,8 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
                     }
                     if ("profile".equals(canal.label())) {
                         vincularCanalPerfil(canal);
+                    } else if ("screen-audio".equals(canal.label())) {
+                        vincularCanalAudioTela(canal);
                     } else {
                         canal.close();
                     }
@@ -1400,6 +1431,116 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
             vincularCanaisLocais();
             DataChannel.Init initCanal = new DataChannel.Init();
             vincularCanalPerfil(conexaoPar.createDataChannel("profile", initCanal));
+
+            DataChannel.Init initAudioTela = new DataChannel.Init();
+            initAudioTela.ordered = false;
+            initAudioTela.maxRetransmits = 0;
+            vincularCanalAudioTela(conexaoPar.createDataChannel("screen-audio", initAudioTela));
+        }
+    }
+
+    private void vincularCanalAudioTela(DataChannel canal) {
+        if (canal == null) {
+            return;
+        }
+        canalAudioTela = canal;
+        ultimaSequenciaAudioTelaRecebida = -1;
+        canal.registerObserver(new DataChannel.Observer() {
+            @Override
+            public void onBufferedAmountChange(long quantidadeAnterior) {
+            }
+
+            @Override
+            public void onStateChange() {
+            }
+
+            @Override
+            public void onMessage(DataChannel.Buffer buffer) {
+                if (!buffer.binary || buffer.data == null || canalAudioTela != canal) {
+                    return;
+                }
+                int tamanho = buffer.data.remaining();
+                if (tamanho <= CodecAdpcm.TAMANHO_CABECALHO_BYTES || tamanho > 8192) {
+                    return;
+                }
+                byte[] pacote = new byte[tamanho];
+                buffer.data.get(pacote);
+                CodecAdpcm.PacoteDecodificado decodificado = CodecAdpcm.decodificar(pacote);
+                if (decodificado == null) {
+                    return;
+                }
+                if (ultimaSequenciaAudioTelaRecebida >= 0) {
+                    short diferenca = (short) (decodificado.sequencia - ultimaSequenciaAudioTelaRecebida);
+                    if (diferenca <= 0) {
+                        return;
+                    }
+                }
+                ultimaSequenciaAudioTelaRecebida = decodificado.sequencia;
+                reproduzirAmostrasAudioTelaRemota(decodificado);
+            }
+        });
+    }
+
+    private synchronized void reproduzirAmostrasAudioTelaRemota(CodecAdpcm.PacoteDecodificado pacote) {
+        if (pacote == null || pacote.amostras == null || pacote.amostras.length == 0) {
+            return;
+        }
+        try {
+            if (reprodutorAudioTelaRemota == null || taxaReprodutorAudioTela != pacote.taxaAmostragem) {
+                liberarReprodutorAudioTela();
+                int minBuffer = android.media.AudioTrack.getMinBufferSize(
+                        pacote.taxaAmostragem,
+                        AudioFormat.CHANNEL_OUT_MONO,
+                        AudioFormat.ENCODING_PCM_16BIT
+                );
+                int tamanhoBuffer = Math.max(minBuffer * 2, pacote.amostras.length * 4);
+                reprodutorAudioTelaRemota = new android.media.AudioTrack.Builder()
+                        .setAudioAttributes(new AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                                .build())
+                        .setAudioFormat(new AudioFormat.Builder()
+                                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                                .setSampleRate(pacote.taxaAmostragem)
+                                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                                .build())
+                        .setBufferSizeInBytes(tamanhoBuffer)
+                        .setTransferMode(android.media.AudioTrack.MODE_STREAM)
+                        .build();
+                taxaReprodutorAudioTela = pacote.taxaAmostragem;
+                reprodutorAudioTelaRemota.play();
+            }
+
+            double ganho = misturadorAudio.obterGanhoEfetivoCanal(MisturadorAudio.CANAL_TELA);
+            short[] amostrasSaida = pacote.amostras;
+            if (ganho <= 0.00001) {
+                java.util.Arrays.fill(amostrasSaida, (short) 0);
+            } else if (Math.abs(ganho - 1.0) >= 0.0001) {
+                for (int i = 0; i < amostrasSaida.length; i++) {
+                    int ajustada = (int) Math.round(amostrasSaida[i] * ganho);
+                    if (ajustada > Short.MAX_VALUE) ajustada = Short.MAX_VALUE;
+                    else if (ajustada < Short.MIN_VALUE) ajustada = Short.MIN_VALUE;
+                    amostrasSaida[i] = (short) ajustada;
+                }
+            }
+            reprodutorAudioTelaRemota.write(amostrasSaida, 0, amostrasSaida.length);
+        } catch (Exception ignorado) {
+        }
+    }
+
+    private synchronized void liberarReprodutorAudioTela() {
+        ultimaSequenciaAudioTelaRecebida = -1;
+        taxaReprodutorAudioTela = 0;
+        if (reprodutorAudioTelaRemota != null) {
+            try {
+                reprodutorAudioTelaRemota.stop();
+            } catch (Exception ignorado) {
+            }
+            try {
+                reprodutorAudioTelaRemota.release();
+            } catch (Exception ignorado) {
+            }
+            reprodutorAudioTelaRemota = null;
         }
     }
 
@@ -1960,6 +2101,7 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
 
     private void limparMidiaRemota() {
         desanexarPiaFalaRemota();
+        liberarReprodutorAudioTela();
         faixaVozRemota = null;
         faixaTelaRemota = null;
         if (faixaVideoRemotaAtual != null && renderizadorRemoto != null) {
@@ -1994,6 +2136,14 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
             } catch (Exception ignorado) {
             }
             canalPerfil = null;
+        }
+        if (canalAudioTela != null) {
+            try {
+                canalAudioTela.unregisterObserver();
+                canalAudioTela.close();
+            } catch (Exception ignorado) {
+            }
+            canalAudioTela = null;
         }
         transceptorMicrofone = null;
         transceptorVideo = null;
