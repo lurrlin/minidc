@@ -183,6 +183,7 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
 
     private Runnable temporizadorReconexao;
     private Runnable temporizadorFalhaIce;
+    private long ultimoPedidoReinicioIceMs = 0L;
 
     public MotorChamadaWebRtc(Context contexto, OuvinteInterfaceChamada ouvinteUi) {
         this.contextoApp = contexto.getApplicationContext();
@@ -370,7 +371,20 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
     @Override
     public void aoEntrarNaSala(String nomeSala, boolean primeiroParticipante) {
         if (jaEntrouAlgumaVez && conexaoPar != null) {
+            limparMidiaRemota();
             fecharConexaoParAtual();
+            parceiroRemotoPronto = false;
+            parceiroEntrouPendente = false;
+            sinaisPendentes.clear();
+            candidatosPendentes.clear();
+            processandoSinais = false;
+            renegociacaoEnfileirada = false;
+            renegociacaoEmAndamento = false;
+            videoRemotoHabilitado = null;
+            telaRemotaCompartilhada = false;
+            perfilRemoto = PerfilUsuario.vazio();
+            ouvinteUi.aoAtualizarEstadoVideoRemoto(false, false);
+            ouvinteUi.aoAtualizarPerfis(perfilRemoto, compartilhandoTela, false);
         }
         salaAtual = nomeSala;
         iniciador = primeiroParticipante;
@@ -432,6 +446,10 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         videoRemotoHabilitado = null;
         telaRemotaCompartilhada = false;
         sinaisPendentes.clear();
+        candidatosPendentes.clear();
+        processandoSinais = false;
+        renegociacaoEnfileirada = false;
+        renegociacaoEmAndamento = false;
         ouvinteUi.aoAtualizarEstadoVideoRemoto(false, false);
         ouvinteUi.aoAtualizarPerfis(perfilRemoto, compartilhandoTela, false);
         ouvinteUi.aoMudarEstadoConexao("connecting");
@@ -1687,10 +1705,35 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
     }
 
     private void tentarReiniciarIce() {
-        if (conexaoPar == null || !iniciador) {
+        if (conexaoPar == null) {
             return;
         }
         if (conexaoPar.connectionState() == PeerConnection.PeerConnectionState.CONNECTED) {
+            return;
+        }
+        if (!iniciador) {
+            long agora = System.currentTimeMillis();
+            if (agora - ultimoPedidoReinicioIceMs < 2000L || salaAtual == null) {
+                return;
+            }
+            ultimoPedidoReinicioIceMs = agora;
+            try {
+                JSONObject sinal = new JSONObject();
+                sinal.put("type", "renegotiate");
+                sinal.put("iceRestart", true);
+                clienteSinalizacao.enviarSinal(salaAtual, sinal);
+            } catch (JSONException ignorado) {
+            }
+            return;
+        }
+        executarReinicioIceIniciador(false);
+    }
+
+    private void executarReinicioIceIniciador(boolean forcarMesmoConectado) {
+        if (conexaoPar == null || !iniciador) {
+            return;
+        }
+        if (!forcarMesmoConectado && conexaoPar.connectionState() == PeerConnection.PeerConnectionState.CONNECTED) {
             return;
         }
         final PeerConnection conexaoAlvo = conexaoPar;
@@ -1886,7 +1929,11 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
                 videoRemotoHabilitado = dados.optBoolean("enabled", false);
                 ouvinteUi.aoAtualizarEstadoVideoRemoto(videoRemotoHabilitado, telaRemotaCompartilhada);
             } else if ("renegotiate".equals(tipo) && iniciador) {
-                renegociarConexao();
+                if (dados.optBoolean("iceRestart", false)) {
+                    executarReinicioIceIniciador(true);
+                } else {
+                    renegociarConexao();
+                }
             }
         } catch (Exception erroSinal) {
             ouvinteUi.aoMostrarToast("Falha no sinal " + tipo + ": " + erroSinal.getMessage(), "error", 9000);
