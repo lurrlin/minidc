@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, desktopCapturer, systemPreferences } = require('electron');
+const { io } = require('socket.io-client');
 let nativeScreenAudio = null;
 try {
   nativeScreenAudio = require('electron-native-screenshare');
@@ -7,7 +8,39 @@ try {
 }
 const path = require('path');
 
+const SOCKET_FORWARDED_EVENTS = [
+  'connect',
+  'disconnect',
+  'join-error',
+  'room-full',
+  'joined-room',
+  'peer-joined',
+  'peer-left',
+  'room-check-result',
+  'signal',
+];
+
 let mainWindow;
+let signalingSocket = null;
+
+function sendSocketEventToRenderer(eventName, ...args) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('socket-event', eventName, ...args);
+  }
+}
+
+function disconnectSignalingSocket(notifyPeer = false) {
+  if (!signalingSocket) return;
+  const socket = signalingSocket;
+  signalingSocket = null;
+  if (notifyPeer && socket.connected) {
+    try {
+      socket.emit('leave-room');
+    } catch {}
+  }
+  socket.removeAllListeners();
+  socket.disconnect();
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -23,7 +56,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
   });
 
@@ -31,6 +64,7 @@ function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
   mainWindow.on('closed', () => {
+    disconnectSignalingSocket(true);
     if (nativeScreenAudio?.isAvailable()) nativeScreenAudio.stopCapture();
     mainWindow = null;
   });
@@ -102,6 +136,39 @@ ipcMain.handle('check-media-permissions', async () => {
     camera: cameraGranted ? 'granted' : 'denied',
     microphone: microphoneGranted ? 'granted' : 'denied',
   };
+});
+
+ipcMain.on('socket-connect', (_event, url) => {
+  disconnectSignalingSocket(false);
+  if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) return;
+
+  signalingSocket = io(url, {
+    transports: ['websocket', 'polling'],
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+  });
+
+  SOCKET_FORWARDED_EVENTS.forEach((eventName) => {
+    signalingSocket.on(eventName, (...args) => sendSocketEventToRenderer(eventName, ...args));
+  });
+  signalingSocket.on('connect_error', (err) => {
+    sendSocketEventToRenderer('connect_error', { message: err?.message || String(err || '') });
+  });
+});
+
+ipcMain.on('socket-emit', (_event, eventName, payload) => {
+  if (!signalingSocket || typeof eventName !== 'string') return;
+  signalingSocket.emit(eventName, payload);
+});
+
+ipcMain.on('socket-disconnect', () => {
+  disconnectSignalingSocket(false);
+});
+
+app.on('before-quit', () => {
+  disconnectSignalingSocket(true);
 });
 
 app.whenReady().then(() => {
