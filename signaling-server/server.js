@@ -11,12 +11,22 @@
  */
 
 require('dotenv').config();
+const crypto = require('crypto');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
+const segredoLogEfemero = crypto.randomBytes(32);
+
+function idSalaParaLog(roomName) {
+  return crypto
+    .createHmac('sha256', segredoLogEfemero)
+    .update(String(roomName || ''))
+    .digest('hex')
+    .slice(0, 8);
+}
 
 const PORT = process.env.PORT || 3000;
 // Em producao, restrinja isso ao dominio/app real se possivel.
@@ -86,7 +96,7 @@ io.on('connection', (socket) => {
     rooms.get(roomName).add(socket.id);
 
     const size = roomSize(roomName);
-    console.log(`[join] ${socket.id} -> "${roomName}" (${size}/2)`);
+    console.log(`[join] ${socket.id} -> #${idSalaParaLog(roomName)} (${size}/2)`);
 
     socket.emit('joined-room', { roomName, isFirstPeer: size === 1 });
 
@@ -130,7 +140,7 @@ io.on('connection', (socket) => {
       socket.to(roomKey(currentRoom)).emit('peer-left');
       if (set.size === 0) rooms.delete(currentRoom);
     }
-    console.log(`[leave] ${socket.id} <- "${currentRoom}" (${reason})`);
+    console.log(`[leave] ${socket.id} <- #${idSalaParaLog(currentRoom)} (${reason})`);
     socket.leave(roomKey(currentRoom));
     currentRoom = null;
   }
@@ -142,4 +152,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { server, io };
+module.exports = { server, io, idSalaParaLog };
