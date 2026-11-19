@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unme.local/schemas/signaling-server.schema.json",
+  "title": "Unme Signaling Server -> Client Events",
+  "description": "Contrato dos eventos emitidos pelo servidor Socket.IO para os clientes.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event", "payload"],
+      "properties": {
+        "event": { "const": "room-check-result" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["roomName", "exists", "available"],
+          "properties": {
+            "roomName": { "type": "string", "maxLength": 40 },
+            "exists": { "type": "boolean" },
+            "available": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event", "payload"],
+      "properties": {
+        "event": { "const": "joined-room" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["roomName", "isFirstPeer"],
+          "properties": {
+            "roomName": { "type": "string", "minLength": 1, "maxLength": 40 },
+            "isFirstPeer": { "type": "boolean" },
+            "protocolVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event", "payload"],
+      "properties": {
+        "event": { "const": "join-error" },
+        "payload": { "type": "string", "minLength": 1 }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event", "payload"],
+      "properties": {
+        "event": { "const": "room-full" },
+        "payload": { "type": "string", "minLength": 1, "maxLength": 40 }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event"],
+      "properties": {
+        "event": { "const": "peer-joined" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event"],
+      "properties": {
+        "event": { "const": "peer-left" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event", "payload"],
+      "properties": {
+        "event": { "const": "signal" },
+        "payload": { "$ref": "./signal-payload.schema.json" }
+      }
+    }
+  ]
+}
