@@ -34,6 +34,7 @@ import org.webrtc.MediaStreamTrack;
 import org.webrtc.PeerConnection;
 import org.webrtc.PeerConnectionFactory;
 import org.webrtc.RendererCommon;
+import org.webrtc.RtpParameters;
 import org.webrtc.RtpReceiver;
 import org.webrtc.RtpSender;
 import org.webrtc.RtpTransceiver;
@@ -751,6 +752,9 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
 
             if (!compartilhandoTela) {
                 transceptorVideo.getSender().setTrack(cameraAtiva ? faixaCameraLocal : null, false);
+                if (cameraAtiva) {
+                    aplicarParametrosEnvioVideo(transceptorVideo.getSender(), false);
+                }
                 atualizarRenderizadorLocal();
             }
             ServicoChamada.iniciarOuAtualizar(contextoApp, salaAtual, compartilhandoTela, cameraAtiva, null);
@@ -809,6 +813,7 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
 
             if (!compartilhandoTela) {
                 transceptorVideo.getSender().setTrack(faixaCameraLocal, false);
+                aplicarParametrosEnvioVideo(transceptorVideo.getSender(), false);
                 atualizarRenderizadorLocal();
             }
 
@@ -905,6 +910,7 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
             ouvinteUi.aoMostrarToast("Não foi possível trocar a tela compartilhada.", "error", 4000);
             return;
         }
+        aplicarParametrosEnvioVideo(remetenteVideo, true);
 
         // Limpa eventual captura anterior
         encerrarRecursosTela(capturadorAnterior, texturaAnterior, faixaAnterior, fonteAnterior);
@@ -963,6 +969,9 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         if (transceptorVideo != null && conexaoPar != null
                 && conexaoPar.signalingState() != PeerConnection.SignalingState.CLOSED) {
             transceptorVideo.getSender().setTrack(cameraAtiva ? faixaCameraLocal : null, false);
+            if (cameraAtiva) {
+                aplicarParametrosEnvioVideo(transceptorVideo.getSender(), false);
+            }
         }
         if (transceptorAudioTela != null && conexaoPar != null
                 && conexaoPar.signalingState() != PeerConnection.SignalingState.CLOSED) {
@@ -1145,6 +1154,31 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         transceptorMicrofone.getSender().setTrack(faixaMicrofoneLocal, false);
         transceptorVideo.getSender().setTrack(videoAtivo, false);
         transceptorAudioTela.getSender().setTrack(null, false);
+        if (videoAtivo != null) {
+            aplicarParametrosEnvioVideo(transceptorVideo.getSender(), compartilhandoTela);
+        }
+    }
+
+    private void aplicarParametrosEnvioVideo(RtpSender remetenteVideo, boolean modoTela) {
+        if (remetenteVideo == null) {
+            return;
+        }
+        try {
+            RtpParameters parametros = remetenteVideo.getParameters();
+            if (parametros == null || parametros.encodings == null || parametros.encodings.isEmpty()) {
+                return;
+            }
+            parametros.degradationPreference = modoTela
+                    ? RtpParameters.DegradationPreference.MAINTAIN_RESOLUTION
+                    : RtpParameters.DegradationPreference.BALANCED;
+            int maxBitrate = modoTela ? 2_500_000 : 1_500_000;
+            for (RtpParameters.Encoding codificacao : parametros.encodings) {
+                codificacao.maxBitrateBps = maxBitrate;
+                codificacao.maxFramerate = 30;
+            }
+            remetenteVideo.setParameters(parametros);
+        } catch (Exception ignorado) {
+        }
     }
 
     private void criarConexaoPar() {
