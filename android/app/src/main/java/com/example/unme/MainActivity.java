@@ -111,7 +111,7 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
     private TextView textoValorVolumeTela;
 
     private FrameLayout quadroLocal;
-    private SurfaceViewRenderer videoLocal;
+    private RenderizadorTexturaVideo videoLocal;
     private View containerAvatarLocal;
     private ImageView imagemAvatarLocal;
     private TextView textoAvatarLocal;

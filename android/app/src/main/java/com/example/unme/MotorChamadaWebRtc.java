@@ -98,7 +98,7 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
     private PeerConnectionFactory fabricaConexao;
     private JavaAudioDeviceModule moduloAudio;
 
-    private SurfaceViewRenderer renderizadorLocal;
+    private RenderizadorTexturaVideo renderizadorLocal;
     private SurfaceViewRenderer renderizadorRemoto;
 
     // Mídia local
@@ -239,14 +239,13 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         return gerenciadorDispositivos;
     }
 
-    public void vincularRenderizadores(SurfaceViewRenderer local, SurfaceViewRenderer remoto) {
+    public void vincularRenderizadores(RenderizadorTexturaVideo local, SurfaceViewRenderer remoto) {
         this.renderizadorLocal = local;
         this.renderizadorRemoto = remoto;
         if (renderizadorLocal != null) {
-            renderizadorLocal.init(obterContextoEgl(), null);
-            renderizadorLocal.setEnableHardwareScaler(true);
-            renderizadorLocal.setMirror(true);
-            renderizadorLocal.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL);
+            renderizadorLocal.inicializar(obterContextoEgl());
+            renderizadorLocal.definirEspelhamento(true);
+            renderizadorLocal.definirTipoEscala(RendererCommon.ScalingType.SCALE_ASPECT_FILL);
         }
         if (renderizadorRemoto != null) {
             renderizadorRemoto.init(obterContextoEgl(), null);
@@ -1047,15 +1046,18 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         }
 
         if (compartilhandoTela && faixaTelaLocal != null) {
-            renderizadorLocal.setMirror(false);
-            renderizadorLocal.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
+            renderizadorLocal.definirEspelhamento(false);
+            renderizadorLocal.definirTipoEscala(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
             faixaTelaLocal.addSink(renderizadorLocal);
         } else if (cameraAtiva && faixaCameraLocal != null) {
-            renderizadorLocal.setMirror(cameraFrontal);
-            renderizadorLocal.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL);
+            renderizadorLocal.definirEspelhamento(cameraFrontal);
+            renderizadorLocal.definirTipoEscala(
+                    RendererCommon.ScalingType.SCALE_ASPECT_FILL,
+                    RendererCommon.ScalingType.SCALE_ASPECT_FIT
+            );
             faixaCameraLocal.addSink(renderizadorLocal);
         } else {
-            renderizadorLocal.clearImage();
+            renderizadorLocal.limparImagem();
         }
     }
 
@@ -1861,7 +1863,7 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         definirFalandoRemoto(false);
 
         if (renderizadorLocal != null) {
-            renderizadorLocal.clearImage();
+            renderizadorLocal.limparImagem();
         }
         if (renderizadorRemoto != null) {
             renderizadorRemoto.clearImage();
@@ -1943,7 +1945,7 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
     public void liberarTudo() {
         sairDaChamada();
         if (renderizadorLocal != null) {
-            renderizadorLocal.release();
+            renderizadorLocal.liberar();
             renderizadorLocal = null;
         }
         if (renderizadorRemoto != null) {
