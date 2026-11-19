@@ -51,6 +51,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Queue;
 
 public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao {
@@ -1282,7 +1283,16 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
                                 canaisAudio.add(t);
                             }
                         }
-                        boolean ehCanalVoz = !canaisAudio.isEmpty() && transceptor == canaisAudio.get(0);
+                        RtpTransceiver primeiroAudio = !canaisAudio.isEmpty() ? canaisAudio.get(0) : null;
+                        MediaStreamTrack faixaPrimeiroAudio = primeiroAudio != null
+                                ? primeiroAudio.getReceiver().track()
+                                : null;
+                        boolean ehCanalVoz = primeiroAudio == null || identificarEhCanalVoz(
+                                transceptor.getMid(),
+                                faixaRecebida.id(),
+                                primeiroAudio.getMid(),
+                                faixaPrimeiroAudio != null ? faixaPrimeiroAudio.id() : null
+                        );
                         if (ehCanalVoz) {
                             desanexarPiaFalaRemota();
                             faixaVozRemota = faixaAudio;
@@ -1952,6 +1962,21 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
             contextoEgl.release();
             contextoEgl = null;
         }
+    }
+
+    static boolean identificarEhCanalVoz(
+            String midTransceptor,
+            String idFaixaTransceptor,
+            String midPrimeiroAudio,
+            String idFaixaPrimeiroAudio
+    ) {
+        if (midPrimeiroAudio != null && !midPrimeiroAudio.isEmpty() && midTransceptor != null) {
+            return Objects.equals(midTransceptor, midPrimeiroAudio);
+        }
+        if (idFaixaPrimeiroAudio != null && idFaixaTransceptor != null) {
+            return Objects.equals(idFaixaTransceptor, idFaixaPrimeiroAudio);
+        }
+        return true;
     }
 
     private void executarNaThreadPrincipal(Runnable tarefa) {

@@ -148,4 +148,16 @@ public class ExampleUnitTest {
         assertEquals(0, buffer.getShort(2));
         assertFalse(MisturadorAudio.detectarFala(MisturadorAudio.calcularNivelAudio(buffer, 8)));
     }
+
+    @Test
+    public void identificacaoCanalVozUsaMidOuIdFaixaSemCompararReferencias() {
+        assertTrue(MotorChamadaWebRtc.identificarEhCanalVoz(
+                new String("0"), "track-a", new String("0"), "track-a"));
+        assertFalse(MotorChamadaWebRtc.identificarEhCanalVoz(
+                new String("2"), "track-b", new String("0"), "track-a"));
+        assertTrue(MotorChamadaWebRtc.identificarEhCanalVoz(
+                null, new String("track-a"), null, new String("track-a")));
+        assertFalse(MotorChamadaWebRtc.identificarEhCanalVoz(
+                null, new String("track-b"), null, new String("track-a")));
+    }
 }
