@@ -1,0 +1,33 @@
+{
+  "description": "Casos compartilhados de validacao de sala e tipos de sinal",
+  "validRoomNames": [
+    { "input": "sala-1", "normalized": "sala-1" },
+    { "input": "  sala-com-espacos  ", "normalized": "sala-com-espacos" },
+    { "input": "AbCdEf123456!@#$", "normalized": "AbCdEf123456!@#$" },
+    { "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "normalized": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+  ],
+  "invalidRoomNames": [
+    "",
+    "   ",
+    "\t\n",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    null
+  ],
+  "validSignalTypes": [
+    "offer",
+    "answer",
+    "candidate",
+    "ready",
+    "screen-share-start",
+    "screen-share-stop",
+    "video-state",
+    "renegotiate"
+  ],
+  "invalidSignalTypes": [
+    "",
+    "profile",
+    "chat",
+    "unknown",
+    "leave-room"
+  ]
+}
