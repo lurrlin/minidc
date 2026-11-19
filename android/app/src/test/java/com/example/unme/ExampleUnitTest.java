@@ -1,9 +1,11 @@
 package com.example.unme;
 
 import org.junit.Test;
+import org.webrtc.CameraEnumerationAndroid;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Arrays;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -172,5 +174,22 @@ public class ExampleUnitTest {
         int[] paisagem = MotorChamadaWebRtc.calcularDimensoesProporcionaisTela(2400, 1080);
         assertEquals(1280, paisagem[0]);
         assertEquals(576, paisagem[1]);
+    }
+
+    @Test
+    public void selecaoFormatoCameraEscolheMaisProximoDe720p() {
+        int[] escolhido = MotorChamadaWebRtc.escolherMelhorFormatoCamera(Arrays.asList(
+                new CameraEnumerationAndroid.CaptureFormat(640, 480, 15000, 30000),
+                new CameraEnumerationAndroid.CaptureFormat(1280, 720, 15000, 30000),
+                new CameraEnumerationAndroid.CaptureFormat(3840, 2160, 15000, 30000)
+        ));
+        assertEquals(1280, escolhido[0]);
+        assertEquals(720, escolhido[1]);
+        assertEquals(30, escolhido[2]);
+
+        int[] padrao = MotorChamadaWebRtc.escolherMelhorFormatoCamera(null);
+        assertEquals(1280, padrao[0]);
+        assertEquals(720, padrao[1]);
+        assertEquals(30, padrao[2]);
     }
 }

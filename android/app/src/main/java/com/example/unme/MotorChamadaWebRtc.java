@@ -20,6 +20,7 @@ import org.webrtc.AudioTrack;
 import org.webrtc.AudioTrackSink;
 import org.webrtc.Camera1Enumerator;
 import org.webrtc.Camera2Enumerator;
+import org.webrtc.CameraEnumerationAndroid;
 import org.webrtc.CameraEnumerator;
 import org.webrtc.CameraVideoCapturer;
 import org.webrtc.DataChannel;
@@ -113,6 +114,9 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
     private VideoTrack faixaCameraLocal;
     private boolean cameraAtiva = false;
     private boolean cameraFrontal = true;
+    private int larguraCameraAtual = 1280;
+    private int alturaCameraAtual = 720;
+    private int fpsCameraAtual = 30;
 
     private ScreenCapturerAndroid capturadorTela;
     private SurfaceTextureHelper auxiliarTexturaTela;
@@ -738,7 +742,7 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
             faixaCameraLocal.setEnabled(cameraAtiva);
             try {
                 if (cameraAtiva) {
-                    capturadorCamera.startCapture(1280, 720, 30);
+                    capturadorCamera.startCapture(larguraCameraAtual, alturaCameraAtual, fpsCameraAtual);
                 } else {
                     capturadorCamera.stopCapture();
                 }
@@ -786,10 +790,17 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
                 throw new IllegalStateException("Falha ao abrir câmera.");
             }
 
+            int[] formatoEscolhido = escolherMelhorFormatoCamera(
+                    enumerador.getSupportedFormats(nomeCameraEscolhida)
+            );
+            larguraCameraAtual = formatoEscolhido[0];
+            alturaCameraAtual = formatoEscolhido[1];
+            fpsCameraAtual = formatoEscolhido[2];
+
             auxiliarTexturaCamera = SurfaceTextureHelper.create("ThreadCameraUnme", obterContextoEgl());
             fonteCameraLocal = fabricaConexao.createVideoSource(false);
             capturador.initialize(auxiliarTexturaCamera, contextoApp, fonteCameraLocal.getCapturerObserver());
-            capturador.startCapture(1280, 720, 30);
+            capturador.startCapture(larguraCameraAtual, alturaCameraAtual, fpsCameraAtual);
 
             capturadorCamera = capturador;
             faixaCameraLocal = fabricaConexao.createVideoTrack("camera_local", fonteCameraLocal);
@@ -2004,6 +2015,40 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
             contextoEgl.release();
             contextoEgl = null;
         }
+    }
+
+    static int[] escolherMelhorFormatoCamera(List<CameraEnumerationAndroid.CaptureFormat> formatosSuportados) {
+        if (formatosSuportados == null || formatosSuportados.isEmpty()) {
+            return new int[]{1280, 720, 30};
+        }
+        CameraEnumerationAndroid.CaptureFormat melhor = null;
+        int menorDistancia = Integer.MAX_VALUE;
+        final int pixelsAlvo = 1280 * 720;
+
+        for (CameraEnumerationAndroid.CaptureFormat formato : formatosSuportados) {
+            if (formato == null || formato.width <= 0 || formato.height <= 0) {
+                continue;
+            }
+            int distancia = Math.abs((formato.width * formato.height) - pixelsAlvo);
+            if (formato.width > 1920 || formato.height > 1080) {
+                distancia += 1_000_000;
+            }
+            if (melhor == null || distancia < menorDistancia) {
+                melhor = formato;
+                menorDistancia = distancia;
+            }
+        }
+
+        if (melhor == null) {
+            return new int[]{1280, 720, 30};
+        }
+
+        int fps = 30;
+        if (melhor.framerate != null && melhor.framerate.max > 0) {
+            int maxFps = melhor.framerate.max > 1000 ? melhor.framerate.max / 1000 : melhor.framerate.max;
+            fps = Math.max(15, Math.min(30, maxFps));
+        }
+        return new int[]{melhor.width, melhor.height, fps};
     }
 
     static boolean identificarEhCanalVoz(
