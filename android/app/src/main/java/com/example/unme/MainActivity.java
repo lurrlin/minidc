@@ -845,6 +845,9 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
         aplicarLayoutPalco();
+        if (motorChamada != null) {
+            motorChamada.atualizarOrientacaoCapturaTela();
+        }
     }
 
     // ---------------------------------------------------------------------

@@ -160,4 +160,17 @@ public class ExampleUnitTest {
         assertFalse(MotorChamadaWebRtc.identificarEhCanalVoz(
                 null, new String("track-b"), null, new String("track-a")));
     }
+
+    @Test
+    public void dimensoesTelaPreservamProporcaoEOrientacao() {
+        int[] retrato = MotorChamadaWebRtc.calcularDimensoesProporcionaisTela(1080, 2400);
+        assertEquals(576, retrato[0]);
+        assertEquals(1280, retrato[1]);
+        assertEquals(0, retrato[0] % 2);
+        assertEquals(0, retrato[1] % 2);
+
+        int[] paisagem = MotorChamadaWebRtc.calcularDimensoesProporcionaisTela(2400, 1080);
+        assertEquals(1280, paisagem[0]);
+        assertEquals(576, paisagem[1]);
+    }
 }

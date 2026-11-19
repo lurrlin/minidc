@@ -121,6 +121,8 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
     private boolean compartilhandoTela = false;
     private boolean compartilhandoAudioTela = false;
     private boolean ocupadoCompartilhando = false;
+    private int larguraTelaAtual = 0;
+    private int alturaTelaAtual = 0;
 
     // Opções de tratamento de voz
     private boolean reducaoRuido = true;
@@ -900,6 +902,8 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         auxiliarTexturaTela = novaTextura;
         fonteTelaLocal = novaFonte;
         faixaTelaLocal = novaFaixa;
+        larguraTelaAtual = dimensoes[0];
+        alturaTelaAtual = dimensoes[1];
         compartilhandoTela = true;
 
         if (incluirAudio) {
@@ -935,6 +939,8 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         auxiliarTexturaTela = null;
         faixaTelaLocal = null;
         fonteTelaLocal = null;
+        larguraTelaAtual = 0;
+        alturaTelaAtual = 0;
 
         if (renderizadorLocal != null && faixa != null) {
             try {
@@ -1006,6 +1012,21 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         }
     }
 
+    public void atualizarOrientacaoCapturaTela() {
+        if (!compartilhandoTela || capturadorTela == null) {
+            return;
+        }
+        int[] novasDimensoes = calcularDimensoesCapturaTela();
+        if (novasDimensoes[0] != larguraTelaAtual || novasDimensoes[1] != alturaTelaAtual) {
+            larguraTelaAtual = novasDimensoes[0];
+            alturaTelaAtual = novasDimensoes[1];
+            try {
+                capturadorTela.changeCaptureFormat(larguraTelaAtual, alturaTelaAtual, 30);
+            } catch (Exception ignorado) {
+            }
+        }
+    }
+
     private int[] calcularDimensoesCapturaTela() {
         WindowManager gerenciadorJanela = (WindowManager) contextoApp.getSystemService(Context.WINDOW_SERVICE);
         DisplayMetrics metricas = contextoApp.getResources().getDisplayMetrics();
@@ -1018,16 +1039,21 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
                 altura = limites.height();
             }
         }
+        return calcularDimensoesProporcionaisTela(largura, altura);
+    }
 
+    static int[] calcularDimensoesProporcionaisTela(int larguraBruta, int alturaBruta) {
+        int largura = larguraBruta > 0 ? larguraBruta : 720;
+        int altura = alturaBruta > 0 ? alturaBruta : 1280;
         int maxDimensao = Math.max(largura, altura);
         if (maxDimensao > 1280) {
             double escala = 1280.0 / maxDimensao;
             largura = (int) Math.round(largura * escala);
             altura = (int) Math.round(altura * escala);
         }
-        // Múltiplos de 16 evitam artefatos em encoders de hardware H.264/VP8
-        largura = Math.max(320, (largura / 16) * 16);
-        altura = Math.max(320, (altura / 16) * 16);
+        // Dimensões pares preservam a proporção original e atendem ao alinhamento YUV420 dos codecs
+        largura = Math.max(320, (largura / 2) * 2);
+        altura = Math.max(320, (altura / 2) * 2);
         return new int[]{largura, altura};
     }
 
@@ -1804,6 +1830,8 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         auxiliarTexturaTela = null;
         faixaTelaLocal = null;
         fonteTelaLocal = null;
+        larguraTelaAtual = 0;
+        alturaTelaAtual = 0;
 
         if (capturadorCamera != null) {
             try {
