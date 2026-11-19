@@ -797,7 +797,7 @@
       remoteVideo.srcObject = null;
       remoteVideo.dataset.empty = 'true';
       document.getElementById('remote-empty').textContent = 'Esperando sua companhia voltar…';
-      remoteTile.classList.remove('is-speaking', 'has-video', 'screen-share');
+      remoteTile.classList.remove('is-speaking', 'has-video', 'screen-share', 'video-portrait');
       speakingIndicators.get(remoteTile)?.();
       await remoteMixer?.close();
       remoteMixer = null;
@@ -881,6 +881,7 @@
       if (event.track.kind === 'video') {
         remoteVideo.srcObject = new MediaStream([event.track]);
         remoteVideo.dataset.empty = 'false';
+        atualizarOrientacaoVideoRemoto();
         remoteTile.classList.toggle('has-video', remoteVideoEnabled ?? !event.track.muted);
         event.track.onunmute = () => {
           remoteTile.classList.toggle('has-video', remoteVideoEnabled ?? true);
@@ -981,6 +982,14 @@
     applyMicrophoneVolume().catch((err) => console.error('Erro ajustando volume do microfone:', err));
   });
   navigator.mediaDevices.addEventListener('devicechange', refreshMicrophones);
+
+  function atualizarOrientacaoVideoRemoto() {
+    const ehRetrato = remoteVideo.videoWidth > 0 && remoteVideo.videoHeight > remoteVideo.videoWidth;
+    remoteTile.classList.toggle('video-portrait', ehRetrato);
+  }
+
+  remoteVideo.addEventListener('loadedmetadata', atualizarOrientacaoVideoRemoto);
+  remoteVideo.addEventListener('resize', atualizarOrientacaoVideoRemoto);
 
   remoteVideo.muted = true;
   remoteVolume.addEventListener('input', applyRemoteVolume);
@@ -1322,8 +1331,7 @@
     closeSourcePicker();
     localTileLabel.textContent = 'Você';
     renderProfiles();
-    remoteTile.classList.remove('screen-share');
-    remoteTile.classList.remove('has-video');
+    remoteTile.classList.remove('screen-share', 'has-video', 'video-portrait');
     document.getElementById('remote-empty').textContent = 'Envie o código e espere sua companhia.';
 
     goToLobbyScreen();
