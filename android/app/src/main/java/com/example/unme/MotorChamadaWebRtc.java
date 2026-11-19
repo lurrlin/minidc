@@ -251,7 +251,10 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
             renderizadorRemoto.init(obterContextoEgl(), null);
             renderizadorRemoto.setEnableHardwareScaler(true);
             renderizadorRemoto.setMirror(false);
-            renderizadorRemoto.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL);
+            renderizadorRemoto.setScalingType(
+                    RendererCommon.ScalingType.SCALE_ASPECT_FILL,
+                    RendererCommon.ScalingType.SCALE_ASPECT_FIT
+            );
         }
     }
 
@@ -1268,11 +1271,15 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
                         }
                         faixaVideoRemotaAtual = (VideoTrack) faixaRecebida;
                         if (renderizadorRemoto != null) {
-                            renderizadorRemoto.setScalingType(
-                                    telaRemotaCompartilhada
-                                            ? RendererCommon.ScalingType.SCALE_ASPECT_FIT
-                                            : RendererCommon.ScalingType.SCALE_ASPECT_FILL
-                            );
+                            if (telaRemotaCompartilhada) {
+                                renderizadorRemoto.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
+                            } else {
+                                renderizadorRemoto.setScalingType(
+                                        RendererCommon.ScalingType.SCALE_ASPECT_FILL,
+                                        RendererCommon.ScalingType.SCALE_ASPECT_FIT
+                                );
+                            }
+                            renderizadorRemoto.requestLayout();
                             faixaVideoRemotaAtual.addSink(renderizadorRemoto);
                         }
                         boolean mostrar = videoRemotoHabilitado != null && videoRemotoHabilitado;
@@ -1647,13 +1654,18 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
                 videoRemotoHabilitado = true;
                 if (renderizadorRemoto != null) {
                     renderizadorRemoto.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
+                    renderizadorRemoto.requestLayout();
                 }
                 ouvinteUi.aoAtualizarEstadoVideoRemoto(true, true);
                 ouvinteUi.aoAtualizarPerfis(perfilRemoto, compartilhandoTela, true);
             } else if ("screen-share-stop".equals(tipo)) {
                 telaRemotaCompartilhada = false;
                 if (renderizadorRemoto != null) {
-                    renderizadorRemoto.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL);
+                    renderizadorRemoto.setScalingType(
+                            RendererCommon.ScalingType.SCALE_ASPECT_FILL,
+                            RendererCommon.ScalingType.SCALE_ASPECT_FIT
+                    );
+                    renderizadorRemoto.requestLayout();
                 }
                 boolean possuiVideo = videoRemotoHabilitado != null && videoRemotoHabilitado;
                 ouvinteUi.aoAtualizarEstadoVideoRemoto(possuiVideo, false);

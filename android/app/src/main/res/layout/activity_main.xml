@@ -572,11 +572,19 @@
                 android:clickable="true"
                 android:focusable="true">
 
-                <org.webrtc.SurfaceViewRenderer
-                    android:id="@+id/video_remoto"
+                <FrameLayout
+                    android:id="@+id/container_video_remoto"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:visibility="gone" />
+                    android:background="@color/cor_fundo_tela_compartilhada"
+                    android:visibility="gone">
+
+                    <org.webrtc.SurfaceViewRenderer
+                        android:id="@+id/video_remoto"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_gravity="center" />
+                </FrameLayout>
 
                 <FrameLayout
                     android:id="@+id/container_avatar_remoto"

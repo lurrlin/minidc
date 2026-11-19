@@ -96,6 +96,7 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
     private LinearLayout palcoVideos;
     private View espacadorQuadros;
     private FrameLayout quadroRemoto;
+    private View containerVideoRemoto;
     private SurfaceViewRenderer videoRemoto;
     private View containerAvatarRemoto;
     private ImageView imagemAvatarRemoto;
@@ -270,6 +271,7 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
         palcoVideos = findViewById(R.id.palco_videos);
         espacadorQuadros = findViewById(R.id.espacador_quadros);
         quadroRemoto = findViewById(R.id.quadro_remoto);
+        containerVideoRemoto = findViewById(R.id.container_video_remoto);
         videoRemoto = findViewById(R.id.video_remoto);
         containerAvatarRemoto = findViewById(R.id.container_avatar_remoto);
         imagemAvatarRemoto = findViewById(R.id.imagem_avatar_remoto);
@@ -751,13 +753,28 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
         }
 
         botaoTelaCheia.setText(ativar ? R.string.botao_sair_tela_cheia : R.string.botao_tela_cheia);
-        videoRemoto.setScalingType(
-                (ativar || telaRemotaEmCompartilhamento)
-                        ? RendererCommon.ScalingType.SCALE_ASPECT_FIT
-                        : RendererCommon.ScalingType.SCALE_ASPECT_FILL
-        );
+        atualizarEscalaVideoRemoto();
         ViewCompat.requestApplyInsets(containerRaiz);
         aplicarLayoutPalco();
+    }
+
+    private void atualizarEscalaVideoRemoto() {
+        if (videoRemoto == null) {
+            return;
+        }
+        if (emTelaCheia || telaRemotaEmCompartilhamento) {
+            videoRemoto.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
+            containerVideoRemoto.setBackgroundColor(
+                    ContextCompat.getColor(this, R.color.cor_fundo_tela_compartilhada)
+            );
+        } else {
+            videoRemoto.setScalingType(
+                    RendererCommon.ScalingType.SCALE_ASPECT_FILL,
+                    RendererCommon.ScalingType.SCALE_ASPECT_FIT
+            );
+            containerVideoRemoto.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+        }
+        videoRemoto.requestLayout();
     }
 
     private void aplicarLayoutPalco() {
@@ -1217,14 +1234,10 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
     public void aoAtualizarEstadoVideoRemoto(boolean possuiVideo, boolean compartilhandoTela) {
         possuiVideoRemotoAtivo = possuiVideo;
         telaRemotaEmCompartilhamento = compartilhandoTela;
-        videoRemoto.setVisibility(possuiVideo ? View.VISIBLE : View.GONE);
+        containerVideoRemoto.setVisibility(possuiVideo ? View.VISIBLE : View.GONE);
         containerAvatarRemoto.setVisibility(possuiVideo ? View.GONE : View.VISIBLE);
         textoVazioRemoto.setVisibility(possuiVideo ? View.GONE : View.VISIBLE);
-        videoRemoto.setScalingType(
-                (emTelaCheia || compartilhandoTela)
-                        ? RendererCommon.ScalingType.SCALE_ASPECT_FIT
-                        : RendererCommon.ScalingType.SCALE_ASPECT_FILL
-        );
+        atualizarEscalaVideoRemoto();
     }
 
     @Override
