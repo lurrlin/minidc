@@ -870,26 +870,43 @@
       document.getElementById('remote-empty').textContent = 'Esperando sua companhia voltar…';
       remoteTile.classList.remove('is-speaking', 'has-video', 'screen-share', 'video-portrait');
       speakingIndicators.get(remoteTile)?.();
-      await remoteMixer?.close();
-      remoteMixer = null;
+
+      const oldPc = pc;
+      pc = null;
+      if (oldPc) oldPc.close();
+
       isInitiator = true;
       remotePeerReady = false;
+      pendingPeerJoined = false;
       remoteProfile = { name: '', photo: '' };
       profileChannel = null;
       screenAudioChannel = null;
       renderProfiles();
       remoteVideoEnabled = null;
       pendingSignals = [];
+      pendingCandidates = [];
+      processingSignals = false;
+      renegotiationQueued = false;
+      renegotiationInProgress = false;
       lastIceRestartRequestAt = 0;
       setConnectionState('connecting');
       callStatus.textContent = 'esperando a outra pessoa voltar...';
+
+      const mixer = remoteMixer;
+      remoteMixer = null;
+      await mixer?.close();
+
+      if (!currentRoom) return;
       // Mantemos nossa PeerConnection e midia local de pe: quando ela
       // reentrar na mesma sala, o servidor manda "peer-joined" de novo
       // e o handshake recomeca (pc antigo e recriado por seguranca).
-      if (pc) {
-        pc.close();
-        pc = null;
+      if (oldPc) {
         await createPeerConnection();
+        await drainSignals();
+        if (pendingPeerJoined && isInitiator) {
+          pendingPeerJoined = false;
+          await createOffer();
+        }
       }
     });
   }
@@ -908,8 +925,9 @@
   // ---------------------------------------------------------------------
   // RTCPeerConnection
   // ---------------------------------------------------------------------
-  async function bindLocalChannels() {
-    const channels = await window.CallMedia.bindMediaChannels(pc, {
+  async function bindLocalChannels(targetPc = pc) {
+    if (!targetPc) return;
+    const channels = await window.CallMedia.bindMediaChannels(targetPc, {
       microphone: microphoneGainDestination?.stream.getAudioTracks()[0] || localStream.getAudioTracks()[0],
       video: screenStream?.getVideoTracks()[0] || cameraTrack,
       screenAudio: screenAudioTrack,
@@ -951,17 +969,16 @@
     videoTransceiver = null;
     screenAudioTransceiver = null;
     microphoneSender = null;
-    pc = new RTCPeerConnection({
+    const connection = new RTCPeerConnection({
       iceServers: CONFIG.ICE_SERVERS,
       iceCandidatePoolSize: 10,
     });
 
     // The answerer binds the offered channels after setRemoteDescription.
     // Empty channels created on both sides leave orphaned recvonly senders.
-    if (isInitiator) await bindLocalChannels();
+    if (isInitiator) await bindLocalChannels(connection);
     if (isInitiator) await applyMicrophoneVolume();
 
-    const connection = pc;
     profileChannel = null;
     screenAudioChannel = null;
     if (isInitiator) {
@@ -978,13 +995,14 @@
       else channel.close();
     };
 
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
+    connection.onicecandidate = (event) => {
+      if (pc === connection && event.candidate) {
         sendSignal({ type: 'candidate', candidate: event.candidate.toJSON() });
       }
     };
 
-    pc.ontrack = (event) => {
+    connection.ontrack = (event) => {
+      if (pc !== connection) return;
       if (event.track.kind === 'video') {
         remoteVideo.srcObject = new MediaStream([event.track]);
         remoteVideo.dataset.empty = 'false';
@@ -999,7 +1017,7 @@
         remoteVideo.play().catch(() => {});
       } else if (event.track.kind === 'audio') {
         const mixer = ensureRemoteMixer();
-        const audioChannels = pc.getTransceivers().filter((channel) => channel.receiver.track.kind === 'audio');
+        const audioChannels = connection.getTransceivers().filter((channel) => channel.receiver.track.kind === 'audio');
         const channel = event.transceiver === audioChannels[0] ? 'voice' : 'screen';
         mixer.addTrack(event.track, channel);
         applyRemoteVolume();
@@ -1007,7 +1025,7 @@
       }
     };
 
-    pc.onconnectionstatechange = () => {
+    connection.onconnectionstatechange = () => {
       if (pc !== connection) return;
       console.log('[pc] connectionState:', pc.connectionState);
 
@@ -1030,7 +1048,7 @@
       }
     };
 
-    pc.oniceconnectionstatechange = () => {
+    connection.oniceconnectionstatechange = () => {
       if (pc !== connection) return;
       if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
         clearTimeout(iceFailureTimer);
@@ -1047,6 +1065,7 @@
       }
     };
 
+    pc = connection;
     return pc;
   }
 
