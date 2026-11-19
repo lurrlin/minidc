@@ -14,7 +14,8 @@ import io.socket.client.Socket;
 
 public class ClienteSinalizacao {
 
-    public static final long TEMPO_LIMITE_VERIFICACAO_MS = 15000L;
+    public static final long TEMPO_LIMITE_VERIFICACAO_MS = 30000L;
+    public static final long TEMPO_AVISO_SERVIDOR_LENTO_MS = 6000L;
 
     public static final class ResultadoVerificacaoSala {
         public final String nomeSala;
@@ -59,6 +60,9 @@ public class ClienteSinalizacao {
     private Socket soquete;
     private RetornoVerificacaoSala retornoVerificacaoPendente;
     private Runnable temporizadorVerificacao;
+    private Runnable temporizadorServidorLento;
+    private String salaVerificacaoAguardandoConexao;
+    private String salaEntradaAguardandoConexao;
 
     public void definirOuvinte(OuvinteSinalizacao ouvinte) {
         this.ouvinte = ouvinte;
@@ -109,6 +113,16 @@ public class ClienteSinalizacao {
 
         soqueteAtual.on(Socket.EVENT_CONNECT, argumentos -> executarNaThreadPrincipal(() -> {
             if (soquete != soqueteAtual) return;
+            if (salaVerificacaoAguardandoConexao != null) {
+                String salaParaVerificar = salaVerificacaoAguardandoConexao;
+                salaVerificacaoAguardandoConexao = null;
+                soqueteAtual.emit("check-room", salaParaVerificar);
+            }
+            if (salaEntradaAguardandoConexao != null) {
+                String salaParaEntrar = salaEntradaAguardandoConexao;
+                salaEntradaAguardandoConexao = null;
+                soqueteAtual.emit("join-room", salaParaEntrar);
+            }
             if (ouvinte != null) {
                 ouvinte.aoConectar();
             }
@@ -179,20 +193,36 @@ public class ClienteSinalizacao {
         }));
     }
 
-    public void verificarSala(String nomeSala, RetornoVerificacaoSala retorno) {
+    public void verificarSala(
+            String nomeSala,
+            Runnable aoDemorarServidor,
+            RetornoVerificacaoSala retorno
+    ) {
         cancelarTemporizadorVerificacao();
         retornoVerificacaoPendente = retorno;
+        salaVerificacaoAguardandoConexao = null;
 
         if (soquete == null) {
             concluirVerificacaoSala(new ResultadoVerificacaoSala(nomeSala, false, false, true));
             return;
         }
 
+        if (aoDemorarServidor != null) {
+            temporizadorServidorLento = aoDemorarServidor;
+            manipuladorPrincipal.postDelayed(temporizadorServidorLento, TEMPO_AVISO_SERVIDOR_LENTO_MS);
+        }
+
         temporizadorVerificacao = () -> concluirVerificacaoSala(
                 new ResultadoVerificacaoSala(nomeSala, false, false, true)
         );
         manipuladorPrincipal.postDelayed(temporizadorVerificacao, TEMPO_LIMITE_VERIFICACAO_MS);
-        soquete.emit("check-room", nomeSala);
+
+        String salaNormalizada = GerenciadorSala.normalizarNomeSala(nomeSala);
+        if (soquete.connected()) {
+            soquete.emit("check-room", salaNormalizada);
+        } else {
+            salaVerificacaoAguardandoConexao = salaNormalizada;
+        }
     }
 
     public void cancelarVerificacaoPendenteComErro() {
@@ -201,6 +231,7 @@ public class ClienteSinalizacao {
 
     private void concluirVerificacaoSala(ResultadoVerificacaoSala resultado) {
         cancelarTemporizadorVerificacao();
+        salaVerificacaoAguardandoConexao = null;
         RetornoVerificacaoSala retorno = retornoVerificacaoPendente;
         retornoVerificacaoPendente = null;
         if (retorno != null) {
@@ -213,13 +244,23 @@ public class ClienteSinalizacao {
             manipuladorPrincipal.removeCallbacks(temporizadorVerificacao);
             temporizadorVerificacao = null;
         }
+        if (temporizadorServidorLento != null) {
+            manipuladorPrincipal.removeCallbacks(temporizadorServidorLento);
+            temporizadorServidorLento = null;
+        }
     }
 
     public void entrarNaSala(String nomeSala) {
         if (soquete == null || !GerenciadorSala.validarNomeSala(nomeSala)) {
             return;
         }
-        soquete.emit("join-room", GerenciadorSala.normalizarNomeSala(nomeSala));
+        String salaNormalizada = GerenciadorSala.normalizarNomeSala(nomeSala);
+        if (soquete.connected()) {
+            salaEntradaAguardandoConexao = null;
+            soquete.emit("join-room", salaNormalizada);
+        } else {
+            salaEntradaAguardandoConexao = salaNormalizada;
+        }
     }
 
     public void enviarSinal(String nomeSala, JSONObject dados) {
@@ -253,6 +294,8 @@ public class ClienteSinalizacao {
     }
 
     private void desconectarInterno(boolean falharVerificacao) {
+        salaVerificacaoAguardandoConexao = null;
+        salaEntradaAguardandoConexao = null;
         if (falharVerificacao && retornoVerificacaoPendente != null) {
             concluirVerificacaoSala(new ResultadoVerificacaoSala("", false, false, true));
         } else {

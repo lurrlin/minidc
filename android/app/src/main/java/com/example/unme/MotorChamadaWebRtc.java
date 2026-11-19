@@ -288,28 +288,36 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         clienteSinalizacao.conectar(ConfiguracaoApp.URL_SERVIDOR_SINALIZACAO);
 
         if (verificarExistencia) {
-            clienteSinalizacao.verificarSala(nomeSala, resultado -> {
-                if (resultado.erro || !resultado.existe) {
-                    clienteSinalizacao.desconectar();
-                    salaAtual = null;
-                    definirEntrando(false);
-                    ouvinteUi.aoMudarStatusLobby(
-                            resultado.erro
-                                    ? "O servidor não respondeu. Tente novamente."
-                                    : "Essa sala não existe.",
-                            "error"
-                    );
-                    return;
-                }
-                if (!resultado.disponivel) {
-                    clienteSinalizacao.desconectar();
-                    salaAtual = null;
-                    definirEntrando(false);
-                    ouvinteUi.aoMudarStatusLobby("Essa sala ja esta cheia.", "error");
-                    return;
-                }
-                clienteSinalizacao.entrarNaSala(nomeSala);
-            });
+            clienteSinalizacao.verificarSala(
+                    nomeSala,
+                    () -> {
+                        if (entrandoNaSala && !jaEntrouAlgumaVez) {
+                            ouvinteUi.aoMudarStatusLobby("Acordando servidor... aguarde um instante.", "info");
+                        }
+                    },
+                    resultado -> {
+                        if (resultado.erro || !resultado.existe) {
+                            clienteSinalizacao.desconectar();
+                            salaAtual = null;
+                            definirEntrando(false);
+                            ouvinteUi.aoMudarStatusLobby(
+                                    resultado.erro
+                                            ? "O servidor não respondeu. Tente novamente."
+                                            : "Essa sala não existe.",
+                                    "error"
+                            );
+                            return;
+                        }
+                        if (!resultado.disponivel) {
+                            clienteSinalizacao.desconectar();
+                            salaAtual = null;
+                            definirEntrando(false);
+                            ouvinteUi.aoMudarStatusLobby("Essa sala ja esta cheia.", "error");
+                            return;
+                        }
+                        clienteSinalizacao.entrarNaSala(nomeSala);
+                    }
+            );
         } else {
             clienteSinalizacao.entrarNaSala(nomeSala);
         }
