@@ -53,12 +53,42 @@ function validRoomName(value) {
 }
 
 const MAX_SIGNAL_PAYLOAD_BYTES = 128 * 1024;
+const VERSAO_PROTOCOLO_ATUAL = '1.1';
+const PLATAFORMAS_VALIDAS = new Set(['desktop', 'android']);
 const roomKey = (name) => `call:${name}`;
 const signalTypes = new Set(['offer', 'answer', 'candidate', 'ready', 'screen-share-start', 'screen-share-stop', 'video-state', 'renegotiate']);
 const REGEX_VERSAO_PROTOCOLO = /^[0-9]+\.[0-9]+$/;
 
 function ehObjetoPlano(valor) {
   return valor !== null && typeof valor === 'object' && !Array.isArray(valor);
+}
+
+function interpretarPedidoEntrada(payload) {
+  if (typeof payload === 'string') {
+    if (!validRoomName(payload)) return null;
+    return { roomName: payload.trim(), protocolVersion: null, platform: null };
+  }
+  if (!ehObjetoPlano(payload) || !validRoomName(payload.roomName)) {
+    return null;
+  }
+
+  let protocolVersion = null;
+  if (payload.protocolVersion !== undefined) {
+    if (typeof payload.protocolVersion !== 'string' || !REGEX_VERSAO_PROTOCOLO.test(payload.protocolVersion)) {
+      return null;
+    }
+    protocolVersion = payload.protocolVersion;
+  }
+
+  let platform = null;
+  if (payload.platform !== undefined) {
+    if (typeof payload.platform !== 'string' || !PLATAFORMAS_VALIDAS.has(payload.platform)) {
+      return null;
+    }
+    platform = payload.platform;
+  }
+
+  return { roomName: payload.roomName.trim(), protocolVersion, platform };
 }
 
 function validarPayloadSinal(data) {
@@ -179,6 +209,7 @@ app.get('/health', (_req, res) => {
     status: 'ok',
     activeRooms: rooms.size,
     uptimeSeconds: Math.round(process.uptime()),
+    protocolVersion: VERSAO_PROTOCOLO_ATUAL,
   });
 });
 
@@ -204,16 +235,17 @@ io.on('connection', (socket) => {
     return true;
   }
 
-  socket.on('join-room', (roomNameRaw) => {
+  socket.on('join-room', (payload) => {
     if (!dentroDoLimite('join-room')) {
       socket.emit('join-error', 'Muitas tentativas em sequencia. Aguarde alguns segundos.');
       return;
     }
-    if (!validRoomName(roomNameRaw)) {
+    const pedido = interpretarPedidoEntrada(payload);
+    if (!pedido) {
       socket.emit('join-error', 'Nome de sala invalido.');
       return;
     }
-    const roomName = roomNameRaw.trim();
+    const { roomName } = pedido;
 
     // Um socket so pode estar em uma sala por vez neste app.
     if (currentRoom) {
@@ -234,7 +266,11 @@ io.on('connection', (socket) => {
     const size = roomSize(roomName);
     console.log(`[join] ${socket.id} -> #${idSalaParaLog(roomName)} (${size}/2)`);
 
-    socket.emit('joined-room', { roomName, isFirstPeer: size === 1 });
+    const respostaEntrada = { roomName, isFirstPeer: size === 1 };
+    if (pedido.protocolVersion) {
+      respostaEntrada.protocolVersion = VERSAO_PROTOCOLO_ATUAL;
+    }
+    socket.emit('joined-room', respostaEntrada);
 
     // Se ja havia alguem na sala, avisa esse peer que o segundo chegou.
     // Convencao: quem JA ESTAVA na sala cria a offer (evita "glare",
@@ -299,4 +335,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { server, io, idSalaParaLog, validarPayloadSinal };
+module.exports = { server, io, idSalaParaLog, validarPayloadSinal, interpretarPedidoEntrada };
