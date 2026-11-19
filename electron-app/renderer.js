@@ -126,6 +126,7 @@
     }
   }
   let profileChannel = null;
+  let screenAudioChannel = null;
   let remoteProfile = { name: '', photo: '' };
 
   function renderProfiles() {
@@ -144,6 +145,26 @@
       remoteProfile = profile;
       renderProfiles();
     });
+  }
+
+  function bindScreenAudioChannel(channel) {
+    screenAudioChannel = channel;
+    channel.binaryType = 'arraybuffer';
+    channel.onopen = () => {
+      if (screenAudioChannel === channel) applyRemoteVolume();
+    };
+    channel.onmessage = async (event) => {
+      if (screenAudioChannel !== channel) return;
+      const data = event.data instanceof Blob ? await event.data.arrayBuffer() : event.data;
+      if (screenAudioChannel !== channel) return;
+      ensureRemoteMixer().feedScreenAudioPacket(data);
+    };
+    channel.onclose = () => {
+      if (screenAudioChannel === channel) {
+        screenAudioChannel = null;
+        remoteMixer?.resetScreenAudio();
+      }
+    };
   }
 
   window.addEventListener('profilechange', () => {
@@ -807,6 +828,7 @@
       remotePeerReady = false;
       remoteProfile = { name: '', photo: '' };
       profileChannel = null;
+      screenAudioChannel = null;
       renderProfiles();
       remoteVideoEnabled = null;
       pendingSignals = [];
@@ -889,9 +911,18 @@
 
     const connection = pc;
     profileChannel = null;
-    if (isInitiator) bindProfileChannel(connection.createDataChannel('profile'));
+    screenAudioChannel = null;
+    if (isInitiator) {
+      bindProfileChannel(connection.createDataChannel('profile'));
+      bindScreenAudioChannel(connection.createDataChannel('screen-audio', { ordered: false, maxRetransmits: 0 }));
+    }
     connection.ondatachannel = ({ channel }) => {
-      if (pc === connection && channel.label === 'profile') bindProfileChannel(channel);
+      if (pc !== connection) {
+        channel.close();
+        return;
+      }
+      if (channel.label === 'profile') bindProfileChannel(channel);
+      else if (channel.label === 'screen-audio') bindScreenAudioChannel(channel);
       else channel.close();
     };
 
@@ -1326,6 +1357,7 @@
     screenStream = null;
     remoteVideoEnabled = null;
     profileChannel = null;
+    screenAudioChannel = null;
     remoteProfile = { name: '', photo: '' };
     currentRoom = null;
     isInitiator = false;
