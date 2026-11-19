@@ -137,14 +137,20 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
     private boolean ganhoAutomatico = true;
 
     // Indicadores de fala
+    private static final long INTERVALO_MINIMO_ATUALIZACAO_FALA_MS = 90L;
+    private static final long ATRASO_SILENCIO_FALA_MS = 350L;
     private volatile int ultimaTaxaGravada = 48000;
     private volatile int ultimosCanaisGravados = 1;
     private double nivelFalaLocalSuavizado = 0.0;
-    private boolean falandoLocal = false;
+    private volatile boolean falandoLocal = false;
+    private long ultimoMomentoVozLocalMs = 0L;
+    private long ultimaPostagemFalaLocalMs = 0L;
     private double nivelFalaRemotaSuavizado = 0.0;
-    private boolean falandoRemoto = false;
-    private Runnable limpadorSilencioLocal;
-    private Runnable limpadorSilencioRemoto;
+    private volatile boolean falandoRemoto = false;
+    private long ultimoMomentoVozRemotaMs = 0L;
+    private long ultimaPostagemFalaRemotaMs = 0L;
+    private final Runnable tarefaSilenciarLocal = () -> definirFalandoLocal(false);
+    private final Runnable tarefaSilenciarRemoto = () -> definirFalandoRemoto(false);
 
     // Estado da sala e WebRTC
     private PeerConnection conexaoPar;
@@ -2011,17 +2017,26 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
 
     private void processarAmostraFalaLocal(double nivelInstantaneo) {
         nivelFalaLocalSuavizado = (0.8 * nivelFalaLocalSuavizado) + (0.2 * nivelInstantaneo);
-        boolean falandoAgora = MisturadorAudio.detectarFala(nivelFalaLocalSuavizado);
-        executarNaThreadPrincipal(() -> {
-            definirFalandoLocal(falandoAgora);
-            if (limpadorSilencioLocal != null) {
-                manipuladorPrincipal.removeCallbacks(limpadorSilencioLocal);
-            }
-            if (falandoAgora) {
-                limpadorSilencioLocal = () -> definirFalandoLocal(false);
-                manipuladorPrincipal.postDelayed(limpadorSilencioLocal, 350L);
-            }
-        });
+        boolean detectouVoz = MisturadorAudio.detectarFala(nivelFalaLocalSuavizado);
+        long agora = android.os.SystemClock.elapsedRealtime();
+
+        if (detectouVoz) {
+            ultimoMomentoVozLocalMs = agora;
+        }
+        boolean deveMostrar = detectouVoz || (agora - ultimoMomentoVozLocalMs) < ATRASO_SILENCIO_FALA_MS;
+
+        if (deveMostrar != falandoLocal
+                && (agora - ultimaPostagemFalaLocalMs) >= INTERVALO_MINIMO_ATUALIZACAO_FALA_MS) {
+            ultimaPostagemFalaLocalMs = agora;
+            final boolean proximoEstado = deveMostrar;
+            executarNaThreadPrincipal(() -> {
+                manipuladorPrincipal.removeCallbacks(tarefaSilenciarLocal);
+                definirFalandoLocal(proximoEstado);
+                if (proximoEstado) {
+                    manipuladorPrincipal.postDelayed(tarefaSilenciarLocal, ATRASO_SILENCIO_FALA_MS + 50L);
+                }
+            });
+        }
     }
 
     private void definirFalandoLocal(boolean valor) {
@@ -2033,17 +2048,26 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
 
     private void processarAmostraFalaRemota(double nivelInstantaneo) {
         nivelFalaRemotaSuavizado = (0.8 * nivelFalaRemotaSuavizado) + (0.2 * nivelInstantaneo);
-        boolean falandoAgora = MisturadorAudio.detectarFala(nivelFalaRemotaSuavizado);
-        executarNaThreadPrincipal(() -> {
-            definirFalandoRemoto(falandoAgora);
-            if (limpadorSilencioRemoto != null) {
-                manipuladorPrincipal.removeCallbacks(limpadorSilencioRemoto);
-            }
-            if (falandoAgora) {
-                limpadorSilencioRemoto = () -> definirFalandoRemoto(false);
-                manipuladorPrincipal.postDelayed(limpadorSilencioRemoto, 350L);
-            }
-        });
+        boolean detectouVoz = MisturadorAudio.detectarFala(nivelFalaRemotaSuavizado);
+        long agora = android.os.SystemClock.elapsedRealtime();
+
+        if (detectouVoz) {
+            ultimoMomentoVozRemotaMs = agora;
+        }
+        boolean deveMostrar = detectouVoz || (agora - ultimoMomentoVozRemotaMs) < ATRASO_SILENCIO_FALA_MS;
+
+        if (deveMostrar != falandoRemoto
+                && (agora - ultimaPostagemFalaRemotaMs) >= INTERVALO_MINIMO_ATUALIZACAO_FALA_MS) {
+            ultimaPostagemFalaRemotaMs = agora;
+            final boolean proximoEstado = deveMostrar;
+            executarNaThreadPrincipal(() -> {
+                manipuladorPrincipal.removeCallbacks(tarefaSilenciarRemoto);
+                definirFalandoRemoto(proximoEstado);
+                if (proximoEstado) {
+                    manipuladorPrincipal.postDelayed(tarefaSilenciarRemoto, ATRASO_SILENCIO_FALA_MS + 50L);
+                }
+            });
+        }
     }
 
     private void definirFalandoRemoto(boolean valor) {
