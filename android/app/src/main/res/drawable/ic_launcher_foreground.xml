@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Os dois pontos do ü representam os dois participantes -->
+    <path
+        android:fillColor="#FF29203E"
+        android:pathData="M43,35m-4.8,0a4.8,4.8 0 1,1 9.6,0a4.8,4.8 0 1,1 -9.6,0" />
+    <path
+        android:fillColor="#FF29203E"
+        android:pathData="M65,35m-4.8,0a4.8,4.8 0 1,1 9.6,0a4.8,4.8 0 1,1 -9.6,0" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M39,47v13c0,8.5 6.5,14.5 15,14.5s15,-6 15,-14.5v-13"
+        android:strokeWidth="8.5"
+        android:strokeColor="#FF29203E"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

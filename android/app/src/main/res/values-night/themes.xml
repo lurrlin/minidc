@@ -1,0 +1,14 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Base.Theme.Unme" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/cor_destaque</item>
+        <item name="colorOnPrimary">@color/cor_destaque_tinta</item>
+        <item name="colorSecondary">@color/cor_ao_vivo</item>
+        <item name="colorSurface">@color/cor_superficie</item>
+        <item name="colorOnSurface">@color/cor_texto</item>
+        <item name="colorError">@color/cor_perigo_suave</item>
+        <item name="android:windowBackground">@color/cor_fundo</item>
+        <item name="android:statusBarColor">@color/cor_fundo</item>
+        <item name="android:navigationBarColor">@color/cor_fundo</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+    </style>
+</resources>
