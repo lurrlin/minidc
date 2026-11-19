@@ -57,6 +57,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao {
 
@@ -92,8 +94,13 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         PerfilUsuario obterPerfilLocalAtual();
     }
 
+    public interface RetornoOperacaoAudio {
+        void aoConcluir(boolean sucesso);
+    }
+
     private final Context contextoApp;
     private final Handler manipuladorPrincipal = new Handler(Looper.getMainLooper());
+    private final ExecutorService executorAudio = Executors.newSingleThreadExecutor();
     private final OuvinteInterfaceChamada ouvinteUi;
     private final ClienteSinalizacao clienteSinalizacao;
     private final MisturadorAudio misturadorAudio;
@@ -110,8 +117,8 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
     // Mídia local
     private AudioSource fonteMicrofoneLocal;
     private AudioTrack faixaMicrofoneLocal;
-    private boolean microfoneHabilitado = true;
-    private boolean atualizandoMicrofone = false;
+    private volatile boolean microfoneHabilitado = true;
+    private volatile boolean atualizandoMicrofone = false;
 
     private VideoCapturer capturadorCamera;
     private SurfaceTextureHelper auxiliarTexturaCamera;
@@ -633,59 +640,79 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         }
     }
 
-    public boolean trocarMicrofone(String idDispositivo) {
+    public void trocarMicrofoneAsync(String idDispositivo, RetornoOperacaoAudio retorno) {
         if (faixaMicrofoneLocal == null || atualizandoMicrofone) {
-            return false;
+            if (retorno != null) retorno.aoConcluir(false);
+            return;
         }
         GerenciadorDispositivosAudio.OpcaoDispositivo opcao =
                 gerenciadorDispositivos.obterMicrofonePorId(idDispositivo);
         if (opcao == null) {
-            return false;
+            if (retorno != null) retorno.aoConcluir(false);
+            return;
         }
-        boolean sucesso = substituirPipelineMicrofone(
-                opcao.infoNativa,
-                reducaoRuido,
-                cancelamentoEco,
-                ganhoAutomatico
-        );
-        if (sucesso) {
-            gerenciadorDispositivos.definirIdMicrofoneSelecionado(opcao.id);
-            ouvinteUi.aoMostrarToast("Microfone alterado.", "info", 2500);
-        } else {
-            ouvinteUi.aoMostrarToast(
-                    "Não foi possível trocar o microfone. O anterior continua ativo.",
-                    "error",
-                    4000
-            );
-        }
-        return sucesso;
+        atualizandoMicrofone = true;
+        final boolean ruido = reducaoRuido;
+        final boolean eco = cancelamentoEco;
+        final boolean ganho = ganhoAutomatico;
+
+        executorAudio.execute(() -> {
+            boolean sucesso = substituirPipelineMicrofone(opcao.infoNativa, ruido, eco, ganho);
+            executarNaThreadPrincipal(() -> {
+                atualizandoMicrofone = false;
+                if (sucesso) {
+                    gerenciadorDispositivos.definirIdMicrofoneSelecionado(opcao.id);
+                    ouvinteUi.aoMostrarToast("Microfone alterado.", "info", 2500);
+                } else {
+                    ouvinteUi.aoMostrarToast(
+                            "Não foi possível trocar o microfone. O anterior continua ativo.",
+                            "error",
+                            4000
+                    );
+                }
+                if (retorno != null) {
+                    retorno.aoConcluir(sucesso);
+                }
+            });
+        });
     }
 
-    public boolean aplicarOpcoesProcessamentoAudio(
+    public void aplicarOpcoesProcessamentoAudioAsync(
             boolean novaReducaoRuido,
             boolean novoCancelamentoEco,
-            boolean novoGanhoAutomatico
+            boolean novoGanhoAutomatico,
+            RetornoOperacaoAudio retorno
     ) {
         if (faixaMicrofoneLocal == null || atualizandoMicrofone) {
-            return false;
+            if (retorno != null) retorno.aoConcluir(false);
+            return;
         }
         GerenciadorDispositivosAudio.OpcaoDispositivo atual =
                 gerenciadorDispositivos.obterMicrofonePorId(
                         gerenciadorDispositivos.obterIdMicrofoneSelecionado()
                 );
         AudioDeviceInfo infoAtual = atual != null ? atual.infoNativa : null;
-        boolean sucesso = substituirPipelineMicrofone(
-                infoAtual,
-                novaReducaoRuido,
-                novoCancelamentoEco,
-                novoGanhoAutomatico
-        );
-        if (sucesso) {
-            this.reducaoRuido = novaReducaoRuido;
-            this.cancelamentoEco = novoCancelamentoEco;
-            this.ganhoAutomatico = novoGanhoAutomatico;
-        }
-        return sucesso;
+        atualizandoMicrofone = true;
+
+        executorAudio.execute(() -> {
+            boolean sucesso = substituirPipelineMicrofone(
+                    infoAtual,
+                    novaReducaoRuido,
+                    novoCancelamentoEco,
+                    novoGanhoAutomatico
+            );
+            executarNaThreadPrincipal(() -> {
+                atualizandoMicrofone = false;
+                if (sucesso) {
+                    this.reducaoRuido = novaReducaoRuido;
+                    this.cancelamentoEco = novoCancelamentoEco;
+                    this.ganhoAutomatico = novoGanhoAutomatico;
+                }
+                if (retorno != null) {
+                    retorno.aoConcluir(sucesso);
+                }
+            });
+        });
     }
 
     private boolean substituirPipelineMicrofone(
@@ -694,17 +721,19 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
             boolean usarCancelamentoEco,
             boolean usarGanhoAutomatico
     ) {
-        if (fabricaConexao == null || atualizandoMicrofone) {
+        if (fabricaConexao == null || faixaMicrofoneLocal == null) {
             return false;
         }
-        atualizandoMicrofone = true;
         AudioSource novaFonte = null;
         AudioTrack novaFaixa = null;
         try {
             if (moduloAudio != null) {
                 moduloAudio.setPreferredInputDevice(dispositivoPreferido);
                 if (JavaAudioDeviceModule.isBuiltInNoiseSuppressorSupported()) {
-                    moduloAudio.setNoiseSuppressorEnabled(usarReducaoRuido);
+                    boolean confirmado = moduloAudio.setNoiseSuppressorEnabled(usarReducaoRuido);
+                    if (!confirmado) {
+                        throw new IllegalStateException("Redução de ruído não confirmada pelo hardware.");
+                    }
                 }
             }
             MediaConstraints restricoes = construirRestricoesAudio(
@@ -749,9 +778,11 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
                 novaFonte.dispose();
             }
             return false;
-        } finally {
-            atualizandoMicrofone = false;
         }
+    }
+
+    public boolean estaAtualizandoMicrofone() {
+        return atualizandoMicrofone;
     }
 
     public boolean obterReducaoRuido() {
@@ -2275,6 +2306,7 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
 
     public void liberarTudo() {
         sairDaChamada();
+        executorAudio.shutdownNow();
         if (renderizadorLocal != null) {
             renderizadorLocal.liberar();
             renderizadorLocal = null;

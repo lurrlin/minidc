@@ -909,10 +909,15 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
                 }
                 String idEscolhido = listaMicrofonesAtual.get(posicao).id;
                 String idAtual = motorChamada.obterGerenciadorDispositivos().obterIdMicrofoneSelecionado();
-                if (!idEscolhido.equals(idAtual)) {
-                    if (!motorChamada.trocarMicrofone(idEscolhido)) {
-                        atualizarListasDispositivosModal();
-                    }
+                if (!idEscolhido.equals(idAtual) && !motorChamada.estaAtualizandoMicrofone()) {
+                    definirControlesMicrofoneHabilitados(false);
+                    motorChamada.trocarMicrofoneAsync(idEscolhido, sucesso -> {
+                        definirControlesMicrofoneHabilitados(true);
+                        if (!sucesso) {
+                            atualizarListasDispositivosModal();
+                        }
+                        sincronizarEstadosProcessamentoAudio();
+                    });
                 }
             }
 
@@ -1015,6 +1020,10 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
     }
 
     private void aplicarAlteracaoProcessamentoAudio() {
+        if (motorChamada.estaAtualizandoMicrofone()) {
+            sincronizarEstadosProcessamentoAudio();
+            return;
+        }
         textoStatusProcessamentoAudio.setText("Aplicando ao microfone…");
         textoStatusProcessamentoAudio.setTextColor(ContextCompat.getColor(this, R.color.cor_texto_secundario));
 
@@ -1022,17 +1031,28 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
         boolean pediuEco = caixaCancelamentoEco.isChecked();
         boolean pediuGanho = caixaGanhoAutomatico.isChecked();
 
-        boolean aplicou = motorChamada.aplicarOpcoesProcessamentoAudio(pediuRuido, pediuEco, pediuGanho);
-        if (aplicou) {
-            textoStatusProcessamentoAudio.setText("Opções aplicadas ao microfone e à voz enviada.");
-            textoStatusProcessamentoAudio.setTextColor(ContextCompat.getColor(this, R.color.cor_texto_secundario));
-        } else {
-            textoStatusProcessamentoAudio.setText(
-                    "O dispositivo não aplicou essa opção. Mantivemos a configuração anterior."
-            );
-            textoStatusProcessamentoAudio.setTextColor(ContextCompat.getColor(this, R.color.cor_perigo_suave));
-        }
-        sincronizarEstadosProcessamentoAudio();
+        definirControlesMicrofoneHabilitados(false);
+        motorChamada.aplicarOpcoesProcessamentoAudioAsync(pediuRuido, pediuEco, pediuGanho, aplicou -> {
+            definirControlesMicrofoneHabilitados(true);
+            if (aplicou) {
+                textoStatusProcessamentoAudio.setText("Opções aplicadas ao microfone e à voz enviada.");
+                textoStatusProcessamentoAudio.setTextColor(ContextCompat.getColor(this, R.color.cor_texto_secundario));
+            } else {
+                textoStatusProcessamentoAudio.setText(
+                        "O dispositivo não aplicou essa opção. Mantivemos a configuração anterior."
+                );
+                textoStatusProcessamentoAudio.setTextColor(ContextCompat.getColor(this, R.color.cor_perigo_suave));
+            }
+            sincronizarEstadosProcessamentoAudio();
+        });
+    }
+
+    private void definirControlesMicrofoneHabilitados(boolean habilitados) {
+        seletorMicrofone.setEnabled(habilitados);
+        barraVolumeEntrada.setEnabled(habilitados);
+        caixaReducaoRuido.setEnabled(habilitados && motorChamada.opcaoProcessamentoDisponivel("noiseSuppression"));
+        caixaCancelamentoEco.setEnabled(habilitados && motorChamada.opcaoProcessamentoDisponivel("echoCancellation"));
+        caixaGanhoAutomatico.setEnabled(habilitados && motorChamada.opcaoProcessamentoDisponivel("autoGainControl"));
     }
 
     private void sincronizarEstadosProcessamentoAudio() {
