@@ -87,6 +87,8 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
 
         void aoMudarFalaRemota(boolean falando);
 
+        void aoAtualizarDispositivosAudio();
+
         PerfilUsuario obterPerfilLocalAtual();
     }
 
@@ -198,6 +200,21 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         this.clienteSinalizacao.definirOuvinte(this);
         this.misturadorAudio = new MisturadorAudio();
         this.gerenciadorDispositivos = new GerenciadorDispositivosAudio(contextoApp);
+        this.gerenciadorDispositivos.definirOuvinteMudanca(new GerenciadorDispositivosAudio.OuvinteMudancaAudio() {
+            @Override
+            public void aoMudarDispositivos() {
+                ouvinteUi.aoAtualizarDispositivosAudio();
+            }
+
+            @Override
+            public void aoAlterarFocoAudio(boolean focoTemporariamentePerdido) {
+                if (moduloAudio != null) {
+                    moduloAudio.setSpeakerMute(
+                            focoTemporariamentePerdido || misturadorAudio.estaSilenciadoTotal()
+                    );
+                }
+            }
+        });
         this.capturadorAudioSistema = new CapturadorAudioSistema();
         inicializarFabricaWebRtc();
     }

@@ -1256,6 +1256,14 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
     }
 
     @Override
+    public void aoAtualizarDispositivosAudio() {
+        if (overlayModalConfiguracoes != null
+                && overlayModalConfiguracoes.getVisibility() == View.VISIBLE) {
+            atualizarListasDispositivosModal();
+        }
+    }
+
+    @Override
     public PerfilUsuario obterPerfilLocalAtual() {
         return perfilLocal;
     }

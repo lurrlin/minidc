@@ -1,9 +1,14 @@
 package com.example.unme;
 
 import android.content.Context;
+import android.media.AudioAttributes;
+import android.media.AudioDeviceCallback;
 import android.media.AudioDeviceInfo;
+import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,7 +39,18 @@ public class GerenciadorDispositivosAudio {
     public static final String SAIDA_FONE_FIO = "saida_fone_fio";
     public static final String SAIDA_BLUETOOTH = "saida_bluetooth";
 
+    public interface OuvinteMudancaAudio {
+        void aoMudarDispositivos();
+
+        void aoAlterarFocoAudio(boolean focoTemporariamentePerdido);
+    }
+
     private final AudioManager gerenciadorAudio;
+    private final Handler manipuladorPrincipal = new Handler(Looper.getMainLooper());
+    private OuvinteMudancaAudio ouvinteMudanca;
+    private AudioDeviceCallback retornoDispositivos;
+    private AudioFocusRequest requisicaoFocoApi26;
+    private AudioManager.OnAudioFocusChangeListener ouvinteFocoAudio;
     private String idMicrofoneSelecionado = "";
     private String idSaidaSelecionada = SAIDA_ALTO_FALANTE;
     private int modoAudioAnterior = AudioManager.MODE_NORMAL;
@@ -46,14 +62,20 @@ public class GerenciadorDispositivosAudio {
                 .getSystemService(Context.AUDIO_SERVICE);
     }
 
+    public void definirOuvinteMudanca(OuvinteMudancaAudio ouvinte) {
+        this.ouvinteMudanca = ouvinte;
+    }
+
     public void iniciarModoComunicacao() {
         if (gerenciadorAudio == null || sessaoComunicacaoAtiva) {
             return;
         }
         modoAudioAnterior = gerenciadorAudio.getMode();
         altoFalanteAnterior = gerenciadorAudio.isSpeakerphoneOn();
+        solicitarFocoAudio();
         gerenciadorAudio.setMode(AudioManager.MODE_IN_COMMUNICATION);
         sessaoComunicacaoAtiva = true;
+        registrarCallbackDispositivos();
         aplicarSaidaAudio(idSaidaSelecionada);
     }
 
@@ -62,6 +84,8 @@ public class GerenciadorDispositivosAudio {
             return;
         }
         sessaoComunicacaoAtiva = false;
+        removerCallbackDispositivos();
+        abandonarFocoAudio();
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 gerenciadorAudio.clearCommunicationDevice();
@@ -72,6 +96,96 @@ public class GerenciadorDispositivosAudio {
             }
             gerenciadorAudio.setMode(modoAudioAnterior);
         } catch (Exception ignorado) {
+        }
+    }
+
+    private void solicitarFocoAudio() {
+        if (gerenciadorAudio == null) {
+            return;
+        }
+        ouvinteFocoAudio = mudanca -> manipuladorPrincipal.post(() -> {
+            if (ouvinteMudanca == null) return;
+            if (mudanca == AudioManager.AUDIOFOCUS_LOSS
+                    || mudanca == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
+                ouvinteMudanca.aoAlterarFocoAudio(true);
+            } else if (mudanca == AudioManager.AUDIOFOCUS_GAIN) {
+                ouvinteMudanca.aoAlterarFocoAudio(false);
+            }
+        });
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                requisicaoFocoApi26 = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                        .setAudioAttributes(new AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                                .build())
+                        .setOnAudioFocusChangeListener(ouvinteFocoAudio, manipuladorPrincipal)
+                        .build();
+                gerenciadorAudio.requestAudioFocus(requisicaoFocoApi26);
+            } else {
+                gerenciadorAudio.requestAudioFocus(
+                        ouvinteFocoAudio,
+                        AudioManager.STREAM_VOICE_CALL,
+                        AudioManager.AUDIOFOCUS_GAIN
+                );
+            }
+        } catch (Exception ignorado) {
+        }
+    }
+
+    private void abandonarFocoAudio() {
+        if (gerenciadorAudio == null) {
+            return;
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && requisicaoFocoApi26 != null) {
+                gerenciadorAudio.abandonAudioFocusRequest(requisicaoFocoApi26);
+                requisicaoFocoApi26 = null;
+            } else if (ouvinteFocoAudio != null) {
+                gerenciadorAudio.abandonAudioFocus(ouvinteFocoAudio);
+            }
+        } catch (Exception ignorado) {
+        }
+        ouvinteFocoAudio = null;
+    }
+
+    private void registrarCallbackDispositivos() {
+        if (gerenciadorAudio == null || retornoDispositivos != null) {
+            return;
+        }
+        retornoDispositivos = new AudioDeviceCallback() {
+            @Override
+            public void onAudioDevicesAdded(AudioDeviceInfo[] dispositivosAdicionados) {
+                aoAlterarHardwareAudio();
+            }
+
+            @Override
+            public void onAudioDevicesRemoved(AudioDeviceInfo[] dispositivosRemovidos) {
+                aoAlterarHardwareAudio();
+            }
+        };
+        gerenciadorAudio.registerAudioDeviceCallback(retornoDispositivos, manipuladorPrincipal);
+    }
+
+    private void removerCallbackDispositivos() {
+        if (gerenciadorAudio != null && retornoDispositivos != null) {
+            try {
+                gerenciadorAudio.unregisterAudioDeviceCallback(retornoDispositivos);
+            } catch (Exception ignorado) {
+            }
+            retornoDispositivos = null;
+        }
+    }
+
+    private void aoAlterarHardwareAudio() {
+        if (!sessaoComunicacaoAtiva) {
+            return;
+        }
+        listarMicrofones();
+        listarSaidasAudio();
+        aplicarSaidaAudio(idSaidaSelecionada);
+        if (ouvinteMudanca != null) {
+            ouvinteMudanca.aoMudarDispositivos();
         }
     }
 
@@ -179,7 +293,7 @@ public class GerenciadorDispositivosAudio {
                 resultado.add(new OpcaoDispositivo(SAIDA_FONE_FIO, "Fone com fio / USB", AudioDeviceInfo.TYPE_WIRED_HEADSET, null));
             }
             if (temBluetooth) {
-                resultado.add(new OpcaoDispositivo(SAIDA_BLUETOOTH, " Áudio Bluetooth", AudioDeviceInfo.TYPE_BLUETOOTH_SCO, null));
+                resultado.add(new OpcaoDispositivo(SAIDA_BLUETOOTH, "Áudio Bluetooth", AudioDeviceInfo.TYPE_BLUETOOTH_SCO, null));
             }
         }
 
