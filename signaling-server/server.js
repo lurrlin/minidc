@@ -52,8 +52,85 @@ function validRoomName(value) {
   return typeof value === 'string' && value.trim().length > 0 && value.trim().length <= 40;
 }
 
+const MAX_SIGNAL_PAYLOAD_BYTES = 128 * 1024;
 const roomKey = (name) => `call:${name}`;
 const signalTypes = new Set(['offer', 'answer', 'candidate', 'ready', 'screen-share-start', 'screen-share-stop', 'video-state', 'renegotiate']);
+const REGEX_VERSAO_PROTOCOLO = /^[0-9]+\.[0-9]+$/;
+
+function ehObjetoPlano(valor) {
+  return valor !== null && typeof valor === 'object' && !Array.isArray(valor);
+}
+
+function validarPayloadSinal(data) {
+  if (!ehObjetoPlano(data) || typeof data.type !== 'string' || !signalTypes.has(data.type)) {
+    return false;
+  }
+
+  let serializado;
+  try {
+    serializado = JSON.stringify(data);
+  } catch {
+    return false;
+  }
+  if (!serializado || Buffer.byteLength(serializado, 'utf8') > MAX_SIGNAL_PAYLOAD_BYTES) {
+    return false;
+  }
+
+  switch (data.type) {
+    case 'ready':
+      if (
+        data.protocolVersion !== undefined &&
+        (typeof data.protocolVersion !== 'string' || !REGEX_VERSAO_PROTOCOLO.test(data.protocolVersion))
+      ) {
+        return false;
+      }
+      if (data.capabilities !== undefined && !ehObjetoPlano(data.capabilities)) {
+        return false;
+      }
+      return true;
+    case 'offer':
+    case 'answer':
+      return (
+        ehObjetoPlano(data.sdp) &&
+        data.sdp.type === data.type &&
+        typeof data.sdp.sdp === 'string' &&
+        data.sdp.sdp.length > 0
+      );
+    case 'candidate': {
+      const candidato = data.candidate;
+      if (!ehObjetoPlano(candidato) || typeof candidato.candidate !== 'string') {
+        return false;
+      }
+      if (candidato.sdpMid !== undefined && candidato.sdpMid !== null && typeof candidato.sdpMid !== 'string') {
+        return false;
+      }
+      if (
+        candidato.sdpMLineIndex !== undefined &&
+        candidato.sdpMLineIndex !== null &&
+        (!Number.isInteger(candidato.sdpMLineIndex) || candidato.sdpMLineIndex < 0)
+      ) {
+        return false;
+      }
+      if (
+        candidato.usernameFragment !== undefined &&
+        candidato.usernameFragment !== null &&
+        typeof candidato.usernameFragment !== 'string'
+      ) {
+        return false;
+      }
+      return true;
+    }
+    case 'video-state':
+      return typeof data.enabled === 'boolean';
+    case 'screen-share-start':
+    case 'screen-share-stop':
+      return true;
+    case 'renegotiate':
+      return data.iceRestart === undefined || typeof data.iceRestart === 'boolean';
+    default:
+      return false;
+  }
+}
 const LIMITES_TAXA = {
   'check-room': { janelaMs: 30000, maxPorSocket: 12, maxPorIp: 60 },
   'join-room': { janelaMs: 30000, maxPorSocket: 10, maxPorIp: 40 },
@@ -185,15 +262,14 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Repassa qualquer mensagem de sinalizacao (offer, answer ou ICE candidate)
-  // para o outro peer da mesma sala. O "shape" do payload e definido pelo
-  // cliente (renderer.js); o servidor so encaminha, sem inspecionar.
+  // Repassa mensagens de sinalizacao (offer, answer, ICE candidate e controle)
+  // apos validar tipo, tamanho e estrutura minima esperada para cada sinal.
   socket.on('signal', (payload) => {
     if (!dentroDoLimite('signal')) return;
-    if (!payload || typeof payload !== 'object') return;
+    if (!ehObjetoPlano(payload)) return;
     const { roomName, data } = payload;
-    if (!currentRoom || roomName !== currentRoom || !data || !signalTypes.has(data.type)) return;
-    if (JSON.stringify(data).length > 128 * 1024) return;
+    if (!currentRoom || roomName !== currentRoom) return;
+    if (!validarPayloadSinal(data)) return;
     socket.to(roomKey(roomName)).emit('signal', data);
   });
 
@@ -223,4 +299,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { server, io, idSalaParaLog };
+module.exports = { server, io, idSalaParaLog, validarPayloadSinal };
