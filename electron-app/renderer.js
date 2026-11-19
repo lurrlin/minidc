@@ -78,6 +78,7 @@
   let remoteMixer = null;
   let deafened = false;
   const speakingIndicators = new Map();
+  let speakingAudioContext = null;
   let joining = false;
   let sharingBusy = false;
   let remoteVideoEnabled = null;
@@ -104,6 +105,7 @@
   let microphoneGainContext = null;
   let microphoneGainNode = null;
   let microphoneGainDestination = null;
+  let microphoneGainAttached = false;
   let microphoneUpdating = false;
   const audioSettings = {
     noiseSuppression: settingsNoiseSuppression,
@@ -284,10 +286,21 @@
   // Midia local + indicador de "quem esta falando"
   // (Web Audio API - AnalyserNode - e a unica animacao com proposito do app)
   // ---------------------------------------------------------------------
+  function ensureSpeakingAudioContext() {
+    if (!speakingAudioContext || speakingAudioContext.state === 'closed') {
+      const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+      speakingAudioContext = new AudioContextCtor();
+    }
+    if (speakingAudioContext.state === 'suspended') {
+      speakingAudioContext.resume().catch(() => {});
+    }
+    return speakingAudioContext;
+  }
+
   function attachSpeakingIndicator(stream, tileEl) {
     speakingIndicators.get(tileEl)?.();
     try {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const audioCtx = ensureSpeakingAudioContext();
       const source = audioCtx.createMediaStreamSource(stream);
       const analyser = audioCtx.createAnalyser();
       analyser.fftSize = 512;
@@ -301,7 +314,7 @@
       speakingIndicators.set(tileEl, () => {
         cancelAnimationFrame(frame);
         source.disconnect();
-        audioCtx.close().catch(() => {});
+        analyser.disconnect();
         tileEl.classList.remove('is-speaking');
       });
       function tick() {
@@ -392,6 +405,7 @@
       microphoneGainContext = pipeline.context;
       microphoneGainNode = pipeline.gain;
       microphoneGainDestination = pipeline.destination;
+      microphoneGainAttached = true;
       pipeline = null;
       stream.removeTrack(currentTrack);
       stream.addTrack(nextTrack);
@@ -447,6 +461,7 @@
     microphoneGainContext = null;
     microphoneGainNode = null;
     microphoneGainDestination = null;
+    microphoneGainAttached = false;
     try {
       const sourceTrack = localStream?.getAudioTracks()[0];
       if (microphoneSender && sourceTrack && pc?.signalingState !== 'closed') {
@@ -469,8 +484,13 @@
       microphoneGainDestination = microphoneGainContext.createMediaStreamDestination();
       source.connect(microphoneGainNode);
       microphoneGainNode.connect(microphoneGainDestination);
+      microphoneGainAttached = false;
     }
-    await microphoneSender.replaceTrack(microphoneGainDestination.stream.getAudioTracks()[0]);
+    const gainTrack = microphoneGainDestination.stream.getAudioTracks()[0];
+    if (!microphoneGainAttached || microphoneSender.track !== gainTrack) {
+      await microphoneSender.replaceTrack(gainTrack);
+      microphoneGainAttached = true;
+    }
     microphoneGainNode.gain.value = Number(settingsInputVolume.value) / 100;
     await microphoneGainContext.resume();
   }
@@ -895,6 +915,9 @@
       screenAudio: screenAudioTrack,
     });
     microphoneSender = channels.microphoneSender;
+    microphoneGainAttached = Boolean(
+      microphoneGainDestination && microphoneSender?.track === microphoneGainDestination.stream.getAudioTracks()[0],
+    );
     videoTransceiver = channels.videoTransceiver;
     screenAudioTransceiver = channels.screenAudioTransceiver;
     if (screenStream || cameraTrack) {
@@ -1385,6 +1408,8 @@
     remoteMixer = null;
     speakingIndicators.forEach((cleanup) => cleanup());
     speakingIndicators.clear();
+    speakingAudioContext?.close().catch(() => {});
+    speakingAudioContext = null;
     stopNativeAudioCapture().catch(() => {});
     stopMicrophoneVolume().catch(() => {});
     if (pc) pc.close();
