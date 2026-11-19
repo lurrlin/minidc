@@ -98,6 +98,7 @@
   let toastTimer = null;
   let reconnectTimer = null;
   let roomCheckResolver = null;
+  let slowServerTimer = null;
   let selectedMicrophoneId = '';
   let microphoneSender = null;
   let microphoneGainContext = null;
@@ -677,9 +678,12 @@
     });
 
     window.electronAPI.socketOn('connect_error', (err) => {
+      clearTimeout(slowServerTimer);
+      slowServerTimer = null;
       setLobbyStatus('Nao foi possivel conectar ao servidor.', 'error');
       if (!hasJoinedOnce) {
         roomCheckResolver?.({ exists: false, available: false, error: true });
+        roomCheckResolver = null;
         window.electronAPI.socketDisconnect();
         currentRoom = null;
         setJoining(false);
@@ -688,6 +692,8 @@
     });
 
     window.electronAPI.socketOn('join-error', (message) => {
+      clearTimeout(slowServerTimer);
+      slowServerTimer = null;
       setLobbyStatus(message, 'error');
       window.electronAPI.socketDisconnect();
       currentRoom = null;
@@ -695,12 +701,16 @@
     });
 
     window.electronAPI.socketOn('room-full', () => {
+      clearTimeout(slowServerTimer);
+      slowServerTimer = null;
       setLobbyStatus('Essa sala ja tem 2 pessoas.', 'error');
       setJoining(false);
       window.electronAPI.socketDisconnect();
     });
 
     window.electronAPI.socketOn('joined-room', async ({ roomName, isFirstPeer }) => {
+      clearTimeout(slowServerTimer);
+      slowServerTimer = null;
       if (hasJoinedOnce) {
         await remoteMixer?.close();
         remoteMixer = null;
@@ -1362,6 +1372,8 @@
   function leaveCall() {
     if (document.fullscreenElement) document.exitFullscreen().catch(console.warn);
     setJoining(false);
+    clearTimeout(slowServerTimer);
+    slowServerTimer = null;
     roomCheckResolver?.({ error: true });
     roomCheckResolver = null;
     window.electronAPI.socketEmit('leave-room');
@@ -1434,6 +1446,12 @@
     if (!roomName || joining) return;
     setJoining(true);
     setLobbyStatus('Conectando ao servidor...', 'info');
+    clearTimeout(slowServerTimer);
+    slowServerTimer = setTimeout(() => {
+      if (joining && !hasJoinedOnce) {
+        setLobbyStatus('Acordando servidor... aguarde um instante.', 'info');
+      }
+    }, 6000);
 
     // IMPORTANTE: socketConnect() precisa vir antes de wireSocketEvents(),
     // porque o wrapper exposto pelo preload so consegue registrar listeners
@@ -1446,13 +1464,15 @@
         const timer = setTimeout(() => {
           roomCheckResolver = null;
           resolve({ error: true });
-        }, 15000);
+        }, 30000);
         roomCheckResolver = (result) => {
           clearTimeout(timer);
           resolve(result);
         };
         window.electronAPI.socketEmit('check-room', roomName);
       });
+      clearTimeout(slowServerTimer);
+      slowServerTimer = null;
       if (roomResult.error || !roomResult.exists) {
         window.electronAPI.socketDisconnect();
         currentRoom = null;
