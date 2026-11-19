@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unme.local/schemas/datachannel-screen-audio.schema.json",
+  "title": "Unme DataChannel Screen Audio Binary Packet",
+  "description": "Especificacao estrutural do pacote binario enviado pelo RTCDataChannel nao-confiavel 'screen-audio' (ordered=false, maxRetransmits=0) em IMA-ADPCM 4-bit mono.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["channelLabel", "ordered", "maxRetransmits", "binaryLayout"],
+  "properties": {
+    "channelLabel": { "const": "screen-audio" },
+    "ordered": { "const": false },
+    "maxRetransmits": { "const": 0 },
+    "binaryLayout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["endianness", "headerBytes", "fields", "codec"],
+      "properties": {
+        "endianness": { "const": "little-endian" },
+        "headerBytes": { "const": 12 },
+        "codec": { "const": "ima-adpcm-4bit-mono" },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["offset", "sizeBytes", "type", "name", "description"],
+            "properties": {
+              "offset": { "type": "integer", "minimum": 0 },
+              "sizeBytes": { "type": "integer", "minimum": 1 },
+              "type": { "type": "string" },
+              "name": { "type": "string" },
+              "description": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "channelLabel": "screen-audio",
+      "ordered": false,
+      "maxRetransmits": 0,
+      "binaryLayout": {
+        "endianness": "little-endian",
+        "headerBytes": 12,
+        "codec": "ima-adpcm-4bit-mono",
+        "fields": [
+          { "offset": 0, "sizeBytes": 1, "type": "uint8", "name": "version", "description": "Versao do formato de pacote (1)" },
+          { "offset": 1, "sizeBytes": 1, "type": "uint8", "name": "codecId", "description": "1 = IMA-ADPCM 4-bit mono" },
+          { "offset": 2, "sizeBytes": 2, "type": "uint16", "name": "sampleRateDiv100", "description": "Taxa de amostragem / 100 (ex: 240 = 24000 Hz)" },
+          { "offset": 4, "sizeBytes": 2, "type": "uint16", "name": "sequence", "description": "Numero de sequencia ciclico para descartar pacotes atrasados" },
+          { "offset": 6, "sizeBytes": 2, "type": "int16", "name": "predictor", "description": "Estado inicial predictor IMA-ADPCM (-32768..32767)" },
+          { "offset": 8, "sizeBytes": 1, "type": "uint8", "name": "stepIndex", "description": "Indice inicial na tabela step IMA-ADPCM (0..88)" },
+          { "offset": 9, "sizeBytes": 1, "type": "uint8", "name": "channels", "description": "Quantidade de canais (1 = mono)" },
+          { "offset": 10, "sizeBytes": 2, "type": "uint16", "name": "sampleCount", "description": "Numero de amostras PCM codificadas no payload (ex: 480 para 20 ms a 24 kHz)" }
+        ]
+      }
+    }
+  ]
+}
