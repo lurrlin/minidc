@@ -8,7 +8,7 @@
         "photo": "data:image/jpeg;base64,QUJDRA=="
       },
       "expected": {
-        "name": "Alexia Maria de Oliveira Santos Pereira",
+        "name": "Alexia Maria de Oliveira Santos Pereira ",
         "photo": "data:image/jpeg;base64,QUJDRA=="
       }
     },

@@ -11,6 +11,7 @@
   },
   "scripts": {
     "test": "electron tests/run.cjs",
+    "test:contract": "node --test tests/contract.test.cjs",
     "test:performance": "electron tests/run.cjs --performance",
     "test:build": "node --test tests/build-dependencies.test.cjs",
     "test:packaged": "electron tests/smoke.cjs --packaged",
