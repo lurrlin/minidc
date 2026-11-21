@@ -1066,8 +1066,12 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
                 }
             });
             compartilhandoAudioTela = iniciouAudio;
-            if (!iniciouAudio) {
-                ouvinteUi.aoMostrarToast("A tela está sendo compartilhada sem áudio.", "info", 4000);
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                ouvinteUi.aoMostrarToast("Áudio interno da tela requer Android 10 ou superior.", "info", 5000);
+            } else if (!iniciouAudio) {
+                ouvinteUi.aoMostrarToast("A tela está sendo compartilhada sem áudio do aparelho.", "info", 4500);
+            } else {
+                ouvinteUi.aoMostrarToast("Áudio da tela ativo (apps protegidos/DRM podem silenciar o som).", "info", 4500);
             }
         }
 
