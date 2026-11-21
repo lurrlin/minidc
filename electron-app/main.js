@@ -99,14 +99,16 @@ function getNativeAudioPid(sourceId) {
   }
 }
 
-ipcMain.handle('start-native-audio', (_event, pid) => {
+ipcMain.handle('start-native-audio', (_event, pid = null, includeMode = true) => {
   if (!nativeScreenAudio?.isAvailable()) {
     throw new Error(nativeScreenAudio?.getLoadError() || 'WASAPI indisponivel.');
   }
-  if (!Number.isInteger(pid) || pid <= 0) throw new Error('PID de audio invalido.');
+  const incluirSomenteAlvo = includeMode !== false;
+  const pidAlvo = incluirSomenteAlvo ? pid : process.pid;
+  if (!Number.isInteger(pidAlvo) || pidAlvo <= 0) throw new Error('PID de audio invalido.');
 
   nativeScreenAudio.stopCapture();
-  const started = nativeScreenAudio.startCapture(pid, true, (data, meta) => {
+  const started = nativeScreenAudio.startCapture(pidAlvo, incluirSomenteAlvo, (data, meta) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('native-audio-data', {
         data: new Uint8Array(data),
@@ -114,7 +116,7 @@ ipcMain.handle('start-native-audio', (_event, pid) => {
       });
     }
   });
-  if (!started) throw new Error('Não foi possível iniciar o áudio da janela.');
+  if (!started) throw new Error('Não foi possível iniciar o áudio nativo da transmissão.');
   return started;
 });
 

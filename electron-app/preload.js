@@ -13,7 +13,7 @@ ipcRenderer.on('socket-event', (_event, eventName, ...args) => {
 
 contextBridge.exposeInMainWorld('electronAPI', {
   getScreenSources: () => ipcRenderer.invoke('get-screen-sources'),
-  startNativeAudio: (pid) => ipcRenderer.invoke('start-native-audio', pid),
+  startNativeAudio: (pid, includeMode = true) => ipcRenderer.invoke('start-native-audio', pid, includeMode),
   stopNativeAudio: () => ipcRenderer.invoke('stop-native-audio'),
   onNativeAudioData: (callback) => {
     const listener = (_event, packet) => callback(packet);

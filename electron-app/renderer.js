@@ -564,8 +564,8 @@
     }
   }
 
-  async function startNativeAudioCapture(pid) {
-    if (!pid || !window.electronAPI.startNativeAudio) return null;
+  async function startNativeAudioCapture(pid, includeMode = true) {
+    if ((includeMode && !pid) || !window.electronAPI.startNativeAudio) return null;
 
     nativeAudioContext = new AudioContext({ sampleRate: 48000 });
     await nativeAudioContext.audioWorklet.addModule(URL.createObjectURL(new Blob([`
@@ -618,7 +618,7 @@
       const samples = new Float32Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 4)).slice();
       nativeAudioNode?.port.postMessage(samples, [samples.buffer]);
     });
-    if (!await window.electronAPI.startNativeAudio(pid)) throw new Error('A captura nativa não iniciou.');
+    if (!await window.electronAPI.startNativeAudio(pid, includeMode)) throw new Error('A captura nativa não iniciou.');
     await nativeAudioContext.resume();
     return nativeAudioDestination.stream.getAudioTracks()[0];
   }
@@ -1280,7 +1280,8 @@
   async function replaceScreenShare(sourceId, includeAudio, nativeAudioPid) {
     const previousScreenStream = screenStream;
     const connection = pc;
-    const useNativeAudio = includeAudio && nativeAudioPid && window.electronAPI.startNativeAudio;
+    const includeNativeTarget = Boolean(includeAudio && nativeAudioPid);
+    const useNativeAudio = Boolean(includeAudio && window.electronAPI.startNativeAudio);
     let nextScreenStream;
     try {
       nextScreenStream = await navigator.mediaDevices.getUserMedia({
@@ -1316,7 +1317,10 @@
     await stopNativeAudioCapture();
     if (useNativeAudio) {
       try {
-        screenAudioTrack = await startNativeAudioCapture(nativeAudioPid);
+        screenAudioTrack = await startNativeAudioCapture(
+          includeNativeTarget ? nativeAudioPid : null,
+          includeNativeTarget,
+        );
         if (screenAudioTrack) screenStream.addTrack(screenAudioTrack);
       } catch (nativeError) {
         console.warn('WASAPI falhou; usando audio de sistema como fallback:', nativeError);
