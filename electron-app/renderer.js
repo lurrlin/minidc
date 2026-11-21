@@ -2,9 +2,6 @@
 (() => {
   const CONFIG = window.APP_CONFIG;
 
-  // ---------------------------------------------------------------------
-  // DOM
-  // ---------------------------------------------------------------------
   const lobbyScreen = document.getElementById('lobby-screen');
   const callScreen = document.getElementById('call-screen');
   const joinForm = document.getElementById('join-form');
@@ -63,9 +60,6 @@
 
   const toastEl = document.getElementById('toast');
 
-  // ---------------------------------------------------------------------
-  // Estado
-  // ---------------------------------------------------------------------
   let localStream = null;
   let cameraTrack = null; // guardamos a track da webcam separada pra poder voltar dela apos o compartilhamento de tela
   let screenStream = null;
@@ -282,10 +276,6 @@
     }
   }
 
-  // ---------------------------------------------------------------------
-  // Midia local + indicador de "quem esta falando"
-  // (Web Audio API - AnalyserNode - e a unica animacao com proposito do app)
-  // ---------------------------------------------------------------------
   function ensureSpeakingAudioContext() {
     if (!speakingAudioContext || speakingAudioContext.state === 'closed') {
       const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
@@ -641,9 +631,6 @@
     }
   }
 
-  // ---------------------------------------------------------------------
-  // Sinalizacao (Socket.io via wrapper exposto no preload)
-  // ---------------------------------------------------------------------
   function sendSignal(data) {
     window.electronAPI.socketEmit('signal', { roomName: currentRoom, data });
   }
@@ -922,9 +909,6 @@
     }
   }
 
-  // ---------------------------------------------------------------------
-  // RTCPeerConnection
-  // ---------------------------------------------------------------------
   async function bindLocalChannels(targetPc = pc) {
     if (!targetPc) return;
     const channels = await window.CallMedia.bindMediaChannels(targetPc, {
@@ -1087,9 +1071,6 @@
     }
   }
 
-  // ---------------------------------------------------------------------
-  // Controles: mutar, camera, compartilhar tela, sair
-  // ---------------------------------------------------------------------
   btnMute.addEventListener('click', () => {
     if (!localStream) return;
     const track = localStream.getAudioTracks()[0];
@@ -1340,8 +1321,6 @@
       screenAudioTrack = screenStream.getAudioTracks()[0] || null;
     }
 
-    // O coracao da troca: substitui a track de video no sender existente,
-    // sem precisar renegociar a offer/answer.
     const sender = pc && (videoTransceiver?.sender || pc.getSenders().find((s) => s.track?.kind === 'video'));
     try {
       if (sender) {
@@ -1376,7 +1355,6 @@
       previousScreenStream.getTracks().forEach((track) => track.stop());
     }
 
-    // Preview local passa a mostrar a tela compartilhada.
     localVideo.srcObject = screenStream;
     localTile.classList.add('screen-share');
     localTile.classList.add('has-video');
@@ -1494,9 +1472,6 @@
     goToLobbyScreen();
   }
 
-  // ---------------------------------------------------------------------
-  // Lobby: entrar na sala
-  // ---------------------------------------------------------------------
   async function beginJoin(roomName, verifyRoom = false) {
     if (!roomName || joining) return;
     setJoining(true);
@@ -1508,9 +1483,6 @@
       }
     }, 6000);
 
-    // IMPORTANTE: socketConnect() precisa vir antes de wireSocketEvents(),
-    // porque o wrapper exposto pelo preload so consegue registrar listeners
-    // (socketOn) depois que o objeto `socket` existe do lado do preload.
     currentRoom = roomName;
     window.electronAPI.socketConnect(CONFIG.SIGNALING_SERVER_URL);
     wireSocketEvents();
@@ -1543,7 +1515,6 @@
         return;
       }
     }
-    // O Socket.IO enfileira este evento se a conexao ainda estiver abrindo.
     window.electronAPI.socketEmit('join-room', roomName);
   }
 
@@ -1578,6 +1549,5 @@
     }
   });
 
-  // Permissoes de camera/microfone no macOS (no-op no Windows).
   window.electronAPI.checkMediaPermissions().catch(() => {});
 })();

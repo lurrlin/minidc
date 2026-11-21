@@ -1,13 +1,6 @@
 /**
  * Signaling Server - Unme (2 usuarios)
- * ---------------------------------------------
- * Responsabilidade UNICA: colocar dois peers na mesma "sala" e repassar
- * SDP (offer/answer) e ICE candidates entre eles. NUNCA toca em audio/video
- * - isso e feito P2P direto entre os clientes via WebRTC.
- *
- * Deploy: Render / Railway / Fly.io / qualquer host Node.
- *   - Start command: npm start
- *   - Variavel de ambiente PORT e injetada automaticamente pela maioria dos hosts.
+ * Repassa apenas sinalizacao SDP/ICE em memoria; nunca trafega audio/video.
  */
 
 require('dotenv').config();
@@ -29,9 +22,6 @@ function idSalaParaLog(roomName) {
 }
 
 const PORT = process.env.PORT || 3000;
-// Em producao, restrinja isso ao dominio/app real se possivel.
-// Como o cliente e um app Electron (sem "origin" de browser tradicional),
-// deixamos "*" por padrao para simplicidade de um app de uso pessoal.
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
 
 const io = new Server(server, {
@@ -203,7 +193,6 @@ app.get('/', (_req, res) => {
   res.send('Unme signaling server - online.');
 });
 
-// Util para checar rapidamente se o server esta de pe (Render/Railway health check)
 app.get('/health', (_req, res) => {
   res.json({
     status: 'ok',
@@ -247,7 +236,6 @@ io.on('connection', (socket) => {
     }
     const { roomName } = pedido;
 
-    // Um socket so pode estar em uma sala por vez neste app.
     if (currentRoom) {
       socket.emit('join-error', 'Voce ja esta em uma sala.');
       return;
@@ -272,9 +260,6 @@ io.on('connection', (socket) => {
     }
     socket.emit('joined-room', respostaEntrada);
 
-    // Se ja havia alguem na sala, avisa esse peer que o segundo chegou.
-    // Convencao: quem JA ESTAVA na sala cria a offer (evita "glare",
-    // ou seja, os dois tentando ofertar ao mesmo tempo).
     if (size === 2) {
       socket.to(roomKey(roomName)).emit('peer-joined');
     }
@@ -298,8 +283,6 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Repassa mensagens de sinalizacao (offer, answer, ICE candidate e controle)
-  // apos validar tipo, tamanho e estrutura minima esperada para cada sinal.
   socket.on('signal', (payload) => {
     if (!dentroDoLimite('signal')) return;
     if (!ehObjetoPlano(payload)) return;

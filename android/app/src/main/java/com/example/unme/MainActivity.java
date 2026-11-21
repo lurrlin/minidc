@@ -60,12 +60,10 @@ import java.util.concurrent.Executors;
 
 public class MainActivity extends AppCompatActivity implements MotorChamadaWebRtc.OuvinteInterfaceChamada {
 
-    // Raiz e telas principais
     private View containerRaiz;
     private View telaLobby;
     private View telaChamada;
 
-    // Lobby
     private View containerAcoesLobby;
     private View formularioEntrarSala;
     private View containerSalaCriada;
@@ -83,7 +81,6 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
     private TextView textoAvatarLobby;
     private TextView textoNomePerfilLobby;
 
-    // Cabeçalho da chamada
     private View cabecalhoChamada;
     private View pontoConexao;
     private TextView textoRotuloSala;
@@ -92,7 +89,6 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
     private TextView botaoCopiarSalaAtiva;
     private View botaoAbrirConfiguracoes;
 
-    // Palco e quadros de vídeo
     private LinearLayout palcoVideos;
     private View espacadorQuadros;
     private FrameLayout quadroRemoto;
@@ -119,7 +115,6 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
     private TextView textoRotuloQuadroLocal;
     private TextView botaoTrocarCamera;
 
-    // Barra inferior de controles
     private View barraControles;
     private View botaoMudo;
     private ImageView iconeMudo;
@@ -135,7 +130,6 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
     private TextView rotuloOuvir;
     private View botaoSair;
 
-    // Modal de Perfil
     private View overlayModalPerfil;
     private View cardModalPerfil;
     private View botaoFecharPerfil;
@@ -148,7 +142,6 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
     private TextView textoStatusPerfil;
     private AppCompatButton botaoSalvarPerfil;
 
-    // Modal de Compartilhamento
     private View overlayModalCompartilhar;
     private View cardModalCompartilhar;
     private View botaoFecharCompartilhar;
@@ -156,7 +149,6 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
     private View botaoFonteTelaAparelho;
     private AppCompatButton botaoPararCompartilhamento;
 
-    // Modal de Configurações
     private View overlayModalConfiguracoes;
     private View cardModalConfiguracoes;
     private View botaoFecharConfiguracoes;
@@ -174,10 +166,8 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
     private TextView textoEstadoGanhoAutomatico;
     private TextView textoStatusProcessamentoAudio;
 
-    // Toast
     private TextView textoToast;
 
-    // Gerenciadores e estado
     private final Handler manipuladorUi = new Handler(Looper.getMainLooper());
     private final ExecutorService executorFundo = Executors.newSingleThreadExecutor();
     private GerenciadorPerfil gerenciadorPerfil;
@@ -201,7 +191,6 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
     private boolean falandoLocalVisivel = false;
     private boolean falandoRemotoVisivel = false;
 
-    // Ações pendentes de permissão
     private String salaPendentePermissao = null;
     private boolean verificarSalaPendente = false;
     private boolean incluirAudioPendenteProjecao = false;
@@ -447,10 +436,6 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
         );
     }
 
-    // ---------------------------------------------------------------------
-    // Lobby e Perfil
-    // ---------------------------------------------------------------------
-
     private void configurarAcoesLobby() {
         botaoCriarSala.setOnClickListener(v -> {
             String codigoSala = GerenciadorSala.gerarCodigoSala();
@@ -641,10 +626,6 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
                 erro ? R.color.cor_perigo_suave : R.color.cor_texto_secundario
         ));
     }
-
-    // ---------------------------------------------------------------------
-    // Controles da Chamada, Tela Cheia e Menu de Volume Independente
-    // ---------------------------------------------------------------------
 
     private void configurarAcoesChamada() {
         botaoCopiarSalaAtiva.setOnClickListener(v -> copiarTextoAreaTransferencia(
@@ -885,10 +866,6 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
         }
     }
 
-    // ---------------------------------------------------------------------
-    // Modal de Compartilhamento de Tela
-    // ---------------------------------------------------------------------
-
     private void configurarAcoesCompartilhamento() {
         botaoFecharCompartilhar.setOnClickListener(v -> fecharModalCompartilhar());
         overlayModalCompartilhar.setOnClickListener(v -> fecharModalCompartilhar());
@@ -925,10 +902,6 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
     private void fecharModalCompartilhar() {
         overlayModalCompartilhar.setVisibility(View.GONE);
     }
-
-    // ---------------------------------------------------------------------
-    // Modal de Configurações de Áudio e Voz
-    // ---------------------------------------------------------------------
 
     private void configurarAcoesConfiguracoes() {
         botaoFecharConfiguracoes.setOnClickListener(v -> fecharModalConfiguracoes());
@@ -1131,10 +1104,6 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
         }
     }
 
-    // ---------------------------------------------------------------------
-    // Retornos do MotorChamadaWebRtc (OuvinteInterfaceChamada)
-    // ---------------------------------------------------------------------
-
     @Override
     public void aoMudarStatusLobby(String mensagem, String tom) {
         textoStatusLobby.setText(mensagem != null ? mensagem : "");
@@ -1325,10 +1294,6 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
         return perfilLocal;
     }
 
-    // ---------------------------------------------------------------------
-    // Auxiliares Visuais da Barra de Controles e Quadros
-    // ---------------------------------------------------------------------
-
     private void atualizarVisualBotaoMudo(boolean mutado) {
         botaoMudo.setBackgroundResource(
                 mutado ? R.drawable.fundo_botao_dock_perigo : R.drawable.fundo_botao_dock_inativo
@@ -1406,10 +1371,6 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
         }
         pontoConexao.setAlpha(1f);
     }
-
-    // ---------------------------------------------------------------------
-    // Navegação (Botão Voltar = Escape do Desktop) e Utilitários
-    // ---------------------------------------------------------------------
 
     private void configurarBotaoVoltar() {
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {

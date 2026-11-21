@@ -1,4 +1,3 @@
-// Shared by the renderer and the real Chromium regression tests.
 (() => {
   const SCREEN_AUDIO_HEADER_BYTES = 12;
   const SCREEN_AUDIO_VERSION = 1;

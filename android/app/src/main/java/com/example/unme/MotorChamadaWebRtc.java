@@ -114,7 +114,6 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
     private RenderizadorTexturaVideo renderizadorLocal;
     private SurfaceViewRenderer renderizadorRemoto;
 
-    // Mídia local
     private AudioSource fonteMicrofoneLocal;
     private AudioTrack faixaMicrofoneLocal;
     private volatile boolean microfoneHabilitado = true;
@@ -141,12 +140,10 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
     private int larguraTelaAtual = 0;
     private int alturaTelaAtual = 0;
 
-    // Opções de tratamento de voz
     private boolean reducaoRuido = true;
     private boolean cancelamentoEco = true;
     private boolean ganhoAutomatico = true;
 
-    // Indicadores de fala
     private static final long INTERVALO_MINIMO_ATUALIZACAO_FALA_MS = 90L;
     private static final long ATRASO_SILENCIO_FALA_MS = 350L;
     private volatile int ultimaTaxaGravada = 48000;
@@ -162,7 +159,6 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
     private final Runnable tarefaSilenciarLocal = () -> definirFalandoLocal(false);
     private final Runnable tarefaSilenciarRemoto = () -> definirFalandoRemoto(false);
 
-    // Estado da sala e WebRTC
     private PeerConnection conexaoPar;
     private RtpTransceiver transceptorMicrofone;
     private RtpTransceiver transceptorVideo;
@@ -305,10 +301,6 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         }
     }
 
-    // ---------------------------------------------------------------------
-    // Lobby e Entrada na Sala
-    // ---------------------------------------------------------------------
-
     public void iniciarEntradaSala(String nomeSalaBruto, boolean verificarExistencia) {
         String nomeSala = GerenciadorSala.normalizarNomeSala(nomeSalaBruto);
         if (nomeSala.isEmpty() || entrandoNaSala) {
@@ -360,10 +352,6 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         entrandoNaSala = valor;
         ouvinteUi.aoMudarEstadoEntrando(valor);
     }
-
-    // ---------------------------------------------------------------------
-    // Eventos do Servidor de Sinalização (Socket.IO)
-    // ---------------------------------------------------------------------
 
     @Override
     public void aoConectar() {
@@ -507,10 +495,6 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         sinaisPendentes.offer(dadosSinal);
         drenarSinais();
     }
-
-    // ---------------------------------------------------------------------
-    // Mídia Local (Microfone, Ganho, Tratamento de Voz, Câmera, Tela)
-    // ---------------------------------------------------------------------
 
     private void iniciarMidiaLocal() {
         gerenciadorDispositivos.iniciarModoComunicacao();
@@ -818,10 +802,6 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         return false;
     }
 
-    // ---------------------------------------------------------------------
-    // Câmera
-    // ---------------------------------------------------------------------
-
     public void alternarCamera() {
         if (faixaMicrofoneLocal == null || transceptorVideo == null) {
             return;
@@ -945,10 +925,6 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         });
     }
 
-    // ---------------------------------------------------------------------
-    // Compartilhamento de Tela + Áudio
-    // ---------------------------------------------------------------------
-
     public void iniciarCompartilhamentoTela(Intent dadosPermissaoProjecao, boolean incluirAudio) {
         if (ocupadoCompartilhando || faixaMicrofoneLocal == null || conexaoPar == null || dadosPermissaoProjecao == null) {
             return;
@@ -1029,7 +1005,6 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         }
         aplicarParametrosEnvioVideo(remetenteVideo, true);
 
-        // Limpa eventual captura anterior
         encerrarRecursosTela(capturadorAnterior, texturaAnterior, faixaAnterior, fonteAnterior);
 
         capturadorTela = novoCapturador;
@@ -1252,10 +1227,6 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
             renderizadorLocal.limparImagem();
         }
     }
-
-    // ---------------------------------------------------------------------
-    // PeerConnection, 3 Canais sendrecv e DataChannel de Perfil
-    // ---------------------------------------------------------------------
 
     private void vincularCanaisLocais() {
         if (conexaoPar == null) {
@@ -1725,10 +1696,6 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         canalPerfil.send(new DataChannel.Buffer(buffer, false));
     }
 
-    // ---------------------------------------------------------------------
-    // Fila de Sinais SDP / ICE e Renegociação
-    // ---------------------------------------------------------------------
-
     private void criarOfertaSePronto() {
         if (conexaoPar == null || !iniciador || !parceiroRemotoPronto) {
             return;
@@ -2097,10 +2064,6 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         }
     }
 
-    // ---------------------------------------------------------------------
-    // Indicadores Visuais de Fala
-    // ---------------------------------------------------------------------
-
     private void processarAmostraFalaLocal(double nivelInstantaneo) {
         nivelFalaLocalSuavizado = (0.8 * nivelFalaLocalSuavizado) + (0.2 * nivelInstantaneo);
         boolean detectouVoz = MisturadorAudio.detectarFala(nivelFalaLocalSuavizado);
@@ -2162,10 +2125,6 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
             ouvinteUi.aoMudarFalaRemota(valor);
         }
     }
-
-    // ---------------------------------------------------------------------
-    // Limpeza e Encerramento da Chamada
-    // ---------------------------------------------------------------------
 
     public void sairDaChamada() {
         definirEntrando(false);
