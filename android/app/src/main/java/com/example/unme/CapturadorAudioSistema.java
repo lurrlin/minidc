@@ -7,6 +7,7 @@ import android.media.AudioPlaybackCaptureConfiguration;
 import android.media.AudioRecord;
 import android.media.projection.MediaProjection;
 import android.os.Build;
+import android.os.Process;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -39,6 +40,8 @@ public class CapturadorAudioSistema {
                             .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
                             .addMatchingUsage(AudioAttributes.USAGE_GAME)
                             .addMatchingUsage(AudioAttributes.USAGE_UNKNOWN)
+                            .excludeUid(Process.myUid())
+                            .excludeUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
                             .build();
 
             AudioFormat formatoAudio = new AudioFormat.Builder()
