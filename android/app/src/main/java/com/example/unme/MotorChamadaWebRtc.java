@@ -126,6 +126,7 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
     private VideoTrack faixaCameraLocal;
     private boolean cameraAtiva = false;
     private boolean cameraFrontal = true;
+    private boolean alternandoLente = false;
     private int larguraCameraAtual = 1280;
     private int alturaCameraAtual = 720;
     private int fpsCameraAtual = 30;
@@ -917,6 +918,33 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         return cameraAtiva;
     }
 
+    public void trocarLenteCamera() {
+        if (!cameraAtiva || compartilhandoTela || alternandoLente || !(capturadorCamera instanceof CameraVideoCapturer)) {
+            return;
+        }
+        alternandoLente = true;
+        ((CameraVideoCapturer) capturadorCamera).switchCamera(new CameraVideoCapturer.CameraSwitchHandler() {
+            @Override
+            public void onCameraSwitchDone(boolean ehCameraFrontal) {
+                executarNaThreadPrincipal(() -> {
+                    alternandoLente = false;
+                    cameraFrontal = ehCameraFrontal;
+                    if (cameraAtiva && !compartilhandoTela && renderizadorLocal != null) {
+                        renderizadorLocal.definirEspelhamento(cameraFrontal);
+                    }
+                });
+            }
+
+            @Override
+            public void onCameraSwitchError(String erroDescricao) {
+                executarNaThreadPrincipal(() -> {
+                    alternandoLente = false;
+                    ouvinteUi.aoMostrarToast("Não foi possível alternar a câmera.", "error", 3500);
+                });
+            }
+        });
+    }
+
     // ---------------------------------------------------------------------
     // Compartilhamento de Tela + Áudio
     // ---------------------------------------------------------------------
@@ -954,6 +982,7 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         VideoSource fonteAnterior = fonteTelaLocal;
         capturadorAudioSistema.parar();
         compartilhandoAudioTela = false;
+        alternandoLente = false;
 
         int[] dimensoes = calcularDimensoesCapturaTela();
         ScreenCapturerAndroid novoCapturador;
@@ -1055,6 +1084,7 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
         }
         compartilhandoTela = false;
         compartilhandoAudioTela = false;
+        alternandoLente = false;
         capturadorAudioSistema.parar();
 
         ScreenCapturerAndroid cap = capturadorTela;
@@ -2141,6 +2171,7 @@ public class MotorChamadaWebRtc implements ClienteSinalizacao.OuvinteSinalizacao
 
         compartilhandoTela = false;
         compartilhandoAudioTela = false;
+        alternandoLente = false;
         capturadorAudioSistema.parar();
         encerrarRecursosTela(capturadorTela, auxiliarTexturaTela, faixaTelaLocal, fonteTelaLocal);
         capturadorTela = null;

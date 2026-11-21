@@ -117,6 +117,7 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
     private ImageView imagemAvatarLocal;
     private TextView textoAvatarLocal;
     private TextView textoRotuloQuadroLocal;
+    private TextView botaoTrocarCamera;
 
     // Barra inferior de controles
     private View barraControles;
@@ -292,6 +293,7 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
         imagemAvatarLocal = findViewById(R.id.imagem_avatar_local);
         textoAvatarLocal = findViewById(R.id.texto_avatar_local);
         textoRotuloQuadroLocal = findViewById(R.id.texto_rotulo_quadro_local);
+        botaoTrocarCamera = findViewById(R.id.botao_trocar_camera);
 
         barraControles = findViewById(R.id.barra_controles);
         botaoMudo = findViewById(R.id.botao_mudo);
@@ -712,6 +714,8 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
                 lancadorPermissaoCamera.launch(Manifest.permission.CAMERA);
             }
         });
+
+        botaoTrocarCamera.setOnClickListener(v -> motorChamada.trocarLenteCamera());
 
         botaoCompartilhar.setOnClickListener(v -> abrirModalCompartilhar());
 
@@ -1246,6 +1250,7 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
     public void aoAtualizarEstadoVideoLocal(boolean possuiVideo, boolean compartilhandoTela, boolean cameraAtiva) {
         videoLocal.setVisibility(possuiVideo ? View.VISIBLE : View.GONE);
         containerAvatarLocal.setVisibility(possuiVideo ? View.GONE : View.VISIBLE);
+        botaoTrocarCamera.setVisibility(cameraAtiva && !compartilhandoTela ? View.VISIBLE : View.GONE);
         atualizarVisualBotaoCamera(cameraAtiva);
         atualizarVisualBotaoCompartilhar(compartilhandoTela);
         textoRotuloQuadroLocal.setText(

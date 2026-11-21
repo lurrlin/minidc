@@ -22,6 +22,7 @@
     <string name="botao_voltar">Voltar</string>
     <string name="rotulo_codigo_sala">Código da sala</string>
     <string name="botao_copiar">Copiar</string>
+    <string name="descricao_copiar_codigo">Copiar código da sala</string>
     <string name="perfil_padrao_lobby">Seu perfil</string>
     <string name="perfil_editar_subtitulo">Editar nome e foto</string>
 
@@ -56,6 +57,8 @@
     <!-- Controles da barra inferior -->
     <string name="controle_microfone">Microfone</string>
     <string name="controle_camera">Câmera</string>
+    <string name="botao_trocar_camera">Trocar câmera</string>
+    <string name="descricao_trocar_camera">Alternar entre câmera frontal e traseira</string>
     <string name="controle_tela">Tela</string>
     <string name="controle_ouvir">Ouvir</string>
     <string name="controle_silenciado">Silenciado</string>
