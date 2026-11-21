@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/overlay_modal_perfil"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/cor_overlay_modal"
+    android:clickable="true"
+    android:focusable="true"
+    android:padding="20dp"
+    android:visibility="gone">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center">
+
+        <LinearLayout
+            android:id="@+id/card_modal_perfil"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/fundo_modal_card"
+            android:clickable="true"
+            android:focusable="true"
+            android:orientation="vertical"
+            android:padding="24dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/perfil_titulo"
+                    android:textColor="@color/cor_texto"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/botao_fechar_perfil"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="@drawable/fundo_botao_cabecalho"
+                    android:contentDescription="Fechar"
+                    android:gravity="center"
+                    android:text="×"
+                    android:textColor="@color/cor_texto_secundario"
+                    android:textSize="20sp" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:lineSpacingExtra="4dp"
+                android:text="@string/perfil_descricao"
+                android:textColor="@color/cor_texto_secundario"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <FrameLayout
+                    android:id="@+id/container_previa_avatar"
+                    android:layout_width="88dp"
+                    android:layout_height="88dp"
+                    android:background="@drawable/fundo_avatar_editor">
+
+                    <ImageView
+                        android:id="@+id/imagem_previa_avatar"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/texto_previa_avatar"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:text="V"
+                        android:textColor="@color/cor_destaque"
+                        android:textSize="28sp"
+                        android:textStyle="bold" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="20dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/botao_escolher_foto"
+                        android:layout_width="wrap_content"
+                        android:layout_height="42dp"
+                        android:background="@drawable/fundo_botao_secundario"
+                        android:paddingHorizontal="16dp"
+                        android:text="@string/botao_escolher_foto"
+                        android:textAllCaps="false"
+                        android:textColor="@color/cor_texto"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/botao_remover_foto"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:paddingVertical="4dp"
+                        android:text="@string/botao_remover_foto"
+                        android:textColor="@color/cor_texto_secundario"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/rotulo_nome_perfil"
+                android:textColor="@color/cor_texto_secundario"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/campo_nome_perfil"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/fundo_campo_texto"
+                android:hint="@string/dica_nome_perfil"
+                android:imeOptions="actionDone"
+                android:inputType="textPersonName"
+                android:maxLength="40"
+                android:padding="14dp"
+                android:singleLine="true"
+                android:textColor="@color/cor_texto"
+                android:textColorHint="@color/cor_texto_apagado"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/texto_status_perfil"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:text="@string/perfil_status_padrao"
+                android:textColor="@color/cor_texto_secundario"
+                android:textSize="12sp" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/botao_salvar_perfil"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:layout_marginTop="18dp"
+                android:background="@drawable/fundo_botao_primario"
+                android:text="@string/botao_salvar_perfil"
+                android:textAllCaps="false"
+                android:textColor="@color/cor_destaque_tinta"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </ScrollView>
+</FrameLayout>

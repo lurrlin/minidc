@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unme.local/schemas/signaling-client.schema.json",
+  "title": "Unme Signaling Client -> Server Events",
+  "description": "Contrato dos eventos enviados pelo cliente (Desktop ou Android) ao servidor Socket.IO.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event", "payload"],
+      "properties": {
+        "event": { "const": "check-room" },
+        "payload": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event", "payload"],
+      "properties": {
+        "event": { "const": "join-room" },
+        "payload": {
+          "oneOf": [
+            {
+              "description": "Formato v1.0 (string pura)",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            {
+              "description": "Formato v1.1 (retrocompativel com metadados opcionais de protocolo)",
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["roomName"],
+              "properties": {
+                "roomName": { "type": "string", "minLength": 1, "maxLength": 40 },
+                "protocolVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+                "platform": { "enum": ["desktop", "android"] }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event", "payload"],
+      "properties": {
+        "event": { "const": "signal" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["roomName", "data"],
+          "properties": {
+            "roomName": { "type": "string", "minLength": 1, "maxLength": 40 },
+            "data": { "$ref": "./signal-payload.schema.json" }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event"],
+      "properties": {
+        "event": { "const": "leave-room" }
+      }
+    }
+  ]
+}

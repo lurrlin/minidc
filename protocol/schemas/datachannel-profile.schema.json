@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unme.local/schemas/datachannel-profile.schema.json",
+  "title": "Unme DataChannel Profile Message",
+  "description": "Payload JSON UTF-8 enviado diretamente P2P pelo RTCDataChannel de label 'profile'.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "profile"],
+  "properties": {
+    "type": { "const": "profile" },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "photo"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "photo": {
+          "type": "string",
+          "maxLength": 60000,
+          "anyOf": [
+            { "const": "" },
+            { "pattern": "^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$" }
+          ]
+        }
+      }
+    }
+  }
+}

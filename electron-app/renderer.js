@@ -2,9 +2,6 @@
 (() => {
   const CONFIG = window.APP_CONFIG;
 
-  // ---------------------------------------------------------------------
-  // DOM
-  // ---------------------------------------------------------------------
   const lobbyScreen = document.getElementById('lobby-screen');
   const callScreen = document.getElementById('call-screen');
   const joinForm = document.getElementById('join-form');
@@ -63,9 +60,6 @@
 
   const toastEl = document.getElementById('toast');
 
-  // ---------------------------------------------------------------------
-  // Estado
-  // ---------------------------------------------------------------------
   let localStream = null;
   let cameraTrack = null; // guardamos a track da webcam separada pra poder voltar dela apos o compartilhamento de tela
   let screenStream = null;
@@ -78,6 +72,7 @@
   let remoteMixer = null;
   let deafened = false;
   const speakingIndicators = new Map();
+  let speakingAudioContext = null;
   let joining = false;
   let sharingBusy = false;
   let remoteVideoEnabled = null;
@@ -94,14 +89,17 @@
   let iceFailureTimer = null;
   let renegotiationQueued = false;
   let renegotiationInProgress = false;
+  let lastIceRestartRequestAt = 0;
   let toastTimer = null;
   let reconnectTimer = null;
   let roomCheckResolver = null;
+  let slowServerTimer = null;
   let selectedMicrophoneId = '';
   let microphoneSender = null;
   let microphoneGainContext = null;
   let microphoneGainNode = null;
   let microphoneGainDestination = null;
+  let microphoneGainAttached = false;
   let microphoneUpdating = false;
   const audioSettings = {
     noiseSuppression: settingsNoiseSuppression,
@@ -126,6 +124,7 @@
     }
   }
   let profileChannel = null;
+  let screenAudioChannel = null;
   let remoteProfile = { name: '', photo: '' };
 
   function renderProfiles() {
@@ -144,6 +143,26 @@
       remoteProfile = profile;
       renderProfiles();
     });
+  }
+
+  function bindScreenAudioChannel(channel) {
+    screenAudioChannel = channel;
+    channel.binaryType = 'arraybuffer';
+    channel.onopen = () => {
+      if (screenAudioChannel === channel) applyRemoteVolume();
+    };
+    channel.onmessage = async (event) => {
+      if (screenAudioChannel !== channel) return;
+      const data = event.data instanceof Blob ? await event.data.arrayBuffer() : event.data;
+      if (screenAudioChannel !== channel) return;
+      ensureRemoteMixer().feedScreenAudioPacket(data);
+    };
+    channel.onclose = () => {
+      if (screenAudioChannel === channel) {
+        screenAudioChannel = null;
+        remoteMixer?.resetScreenAudio();
+      }
+    };
   }
 
   window.addEventListener('profilechange', () => {
@@ -257,14 +276,21 @@
     }
   }
 
-  // ---------------------------------------------------------------------
-  // Midia local + indicador de "quem esta falando"
-  // (Web Audio API - AnalyserNode - e a unica animacao com proposito do app)
-  // ---------------------------------------------------------------------
+  function ensureSpeakingAudioContext() {
+    if (!speakingAudioContext || speakingAudioContext.state === 'closed') {
+      const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+      speakingAudioContext = new AudioContextCtor();
+    }
+    if (speakingAudioContext.state === 'suspended') {
+      speakingAudioContext.resume().catch(() => {});
+    }
+    return speakingAudioContext;
+  }
+
   function attachSpeakingIndicator(stream, tileEl) {
     speakingIndicators.get(tileEl)?.();
     try {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const audioCtx = ensureSpeakingAudioContext();
       const source = audioCtx.createMediaStreamSource(stream);
       const analyser = audioCtx.createAnalyser();
       analyser.fftSize = 512;
@@ -278,7 +304,7 @@
       speakingIndicators.set(tileEl, () => {
         cancelAnimationFrame(frame);
         source.disconnect();
-        audioCtx.close().catch(() => {});
+        analyser.disconnect();
         tileEl.classList.remove('is-speaking');
       });
       function tick() {
@@ -369,6 +395,7 @@
       microphoneGainContext = pipeline.context;
       microphoneGainNode = pipeline.gain;
       microphoneGainDestination = pipeline.destination;
+      microphoneGainAttached = true;
       pipeline = null;
       stream.removeTrack(currentTrack);
       stream.addTrack(nextTrack);
@@ -424,6 +451,7 @@
     microphoneGainContext = null;
     microphoneGainNode = null;
     microphoneGainDestination = null;
+    microphoneGainAttached = false;
     try {
       const sourceTrack = localStream?.getAudioTracks()[0];
       if (microphoneSender && sourceTrack && pc?.signalingState !== 'closed') {
@@ -446,8 +474,13 @@
       microphoneGainDestination = microphoneGainContext.createMediaStreamDestination();
       source.connect(microphoneGainNode);
       microphoneGainNode.connect(microphoneGainDestination);
+      microphoneGainAttached = false;
     }
-    await microphoneSender.replaceTrack(microphoneGainDestination.stream.getAudioTracks()[0]);
+    const gainTrack = microphoneGainDestination.stream.getAudioTracks()[0];
+    if (!microphoneGainAttached || microphoneSender.track !== gainTrack) {
+      await microphoneSender.replaceTrack(gainTrack);
+      microphoneGainAttached = true;
+    }
     microphoneGainNode.gain.value = Number(settingsInputVolume.value) / 100;
     await microphoneGainContext.resume();
   }
@@ -504,9 +537,11 @@
         video: { width: { ideal: 1280 }, height: { ideal: 720 } },
       });
       cameraTrack = cameraStream.getVideoTracks()[0];
+      if ('contentHint' in cameraTrack) cameraTrack.contentHint = 'motion';
       localStream.addTrack(cameraTrack);
       if (!screenStream) {
         await videoTransceiver.sender.replaceTrack(cameraTrack);
+        await aplicarParametrosEnvioVideo(videoTransceiver.sender, false);
         localVideo.srcObject = localStream;
       }
       localTile.classList.add('has-video', 'video-square');
@@ -519,8 +554,8 @@
     }
   }
 
-  async function startNativeAudioCapture(pid) {
-    if (!pid || !window.electronAPI.startNativeAudio) return null;
+  async function startNativeAudioCapture(pid, includeMode = true) {
+    if ((includeMode && !pid) || !window.electronAPI.startNativeAudio) return null;
 
     nativeAudioContext = new AudioContext({ sampleRate: 48000 });
     await nativeAudioContext.audioWorklet.addModule(URL.createObjectURL(new Blob([`
@@ -573,7 +608,7 @@
       const samples = new Float32Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 4)).slice();
       nativeAudioNode?.port.postMessage(samples, [samples.buffer]);
     });
-    if (!await window.electronAPI.startNativeAudio(pid)) throw new Error('A captura nativa não iniciou.');
+    if (!await window.electronAPI.startNativeAudio(pid, includeMode)) throw new Error('A captura nativa não iniciou.');
     await nativeAudioContext.resume();
     return nativeAudioDestination.stream.getAudioTracks()[0];
   }
@@ -596,9 +631,6 @@
     }
   }
 
-  // ---------------------------------------------------------------------
-  // Sinalizacao (Socket.io via wrapper exposto no preload)
-  // ---------------------------------------------------------------------
   function sendSignal(data) {
     window.electronAPI.socketEmit('signal', { roomName: currentRoom, data });
   }
@@ -653,9 +685,12 @@
     });
 
     window.electronAPI.socketOn('connect_error', (err) => {
+      clearTimeout(slowServerTimer);
+      slowServerTimer = null;
       setLobbyStatus('Nao foi possivel conectar ao servidor.', 'error');
       if (!hasJoinedOnce) {
         roomCheckResolver?.({ exists: false, available: false, error: true });
+        roomCheckResolver = null;
         window.electronAPI.socketDisconnect();
         currentRoom = null;
         setJoining(false);
@@ -664,6 +699,8 @@
     });
 
     window.electronAPI.socketOn('join-error', (message) => {
+      clearTimeout(slowServerTimer);
+      slowServerTimer = null;
       setLobbyStatus(message, 'error');
       window.electronAPI.socketDisconnect();
       currentRoom = null;
@@ -671,15 +708,35 @@
     });
 
     window.electronAPI.socketOn('room-full', () => {
+      clearTimeout(slowServerTimer);
+      slowServerTimer = null;
       setLobbyStatus('Essa sala ja tem 2 pessoas.', 'error');
       setJoining(false);
       window.electronAPI.socketDisconnect();
     });
 
     window.electronAPI.socketOn('joined-room', async ({ roomName, isFirstPeer }) => {
-      if (hasJoinedOnce && pc) {
-        pc.close();
-        pc = null;
+      clearTimeout(slowServerTimer);
+      slowServerTimer = null;
+      if (hasJoinedOnce) {
+        await remoteMixer?.close();
+        remoteMixer = null;
+        remotePeerReady = false;
+        pendingPeerJoined = false;
+        pendingSignals = [];
+        pendingCandidates = [];
+        processingSignals = false;
+        renegotiationQueued = false;
+        renegotiationInProgress = false;
+        lastIceRestartRequestAt = 0;
+        remoteProfile = { name: '', photo: '' };
+        profileChannel = null;
+        screenAudioChannel = null;
+        remoteVideoEnabled = null;
+        if (pc) {
+          pc.close();
+          pc = null;
+        }
       }
       currentRoom = roomName;
       isInitiator = isFirstPeer;
@@ -784,7 +841,8 @@
           remoteVideoEnabled = Boolean(data.enabled);
           remoteTile.classList.toggle('has-video', remoteVideoEnabled);
         } else if (data.type === 'renegotiate' && isInitiator) {
-          await renegotiateConnection();
+          if (data.iceRestart) await attemptIceRestart(true);
+          else await renegotiateConnection();
         }
       } catch (err) {
         console.error('Erro processando sinal:', data.type, err);
@@ -797,26 +855,45 @@
       remoteVideo.srcObject = null;
       remoteVideo.dataset.empty = 'true';
       document.getElementById('remote-empty').textContent = 'Esperando sua companhia voltar…';
-      remoteTile.classList.remove('is-speaking', 'has-video', 'screen-share');
+      remoteTile.classList.remove('is-speaking', 'has-video', 'screen-share', 'video-portrait');
       speakingIndicators.get(remoteTile)?.();
-      await remoteMixer?.close();
-      remoteMixer = null;
+
+      const oldPc = pc;
+      pc = null;
+      if (oldPc) oldPc.close();
+
       isInitiator = true;
       remotePeerReady = false;
+      pendingPeerJoined = false;
       remoteProfile = { name: '', photo: '' };
       profileChannel = null;
+      screenAudioChannel = null;
       renderProfiles();
       remoteVideoEnabled = null;
       pendingSignals = [];
+      pendingCandidates = [];
+      processingSignals = false;
+      renegotiationQueued = false;
+      renegotiationInProgress = false;
+      lastIceRestartRequestAt = 0;
       setConnectionState('connecting');
       callStatus.textContent = 'esperando a outra pessoa voltar...';
+
+      const mixer = remoteMixer;
+      remoteMixer = null;
+      await mixer?.close();
+
+      if (!currentRoom) return;
       // Mantemos nossa PeerConnection e midia local de pe: quando ela
       // reentrar na mesma sala, o servidor manda "peer-joined" de novo
       // e o handshake recomeca (pc antigo e recriado por seguranca).
-      if (pc) {
-        pc.close();
-        pc = null;
+      if (oldPc) {
         await createPeerConnection();
+        await drainSignals();
+        if (pendingPeerJoined && isInitiator) {
+          pendingPeerJoined = false;
+          await createOffer();
+        }
       }
     });
   }
@@ -832,18 +909,41 @@
     }
   }
 
-  // ---------------------------------------------------------------------
-  // RTCPeerConnection
-  // ---------------------------------------------------------------------
-  async function bindLocalChannels() {
-    const channels = await window.CallMedia.bindMediaChannels(pc, {
+  async function bindLocalChannels(targetPc = pc) {
+    if (!targetPc) return;
+    const channels = await window.CallMedia.bindMediaChannels(targetPc, {
       microphone: microphoneGainDestination?.stream.getAudioTracks()[0] || localStream.getAudioTracks()[0],
       video: screenStream?.getVideoTracks()[0] || cameraTrack,
       screenAudio: screenAudioTrack,
     });
     microphoneSender = channels.microphoneSender;
+    microphoneGainAttached = Boolean(
+      microphoneGainDestination && microphoneSender?.track === microphoneGainDestination.stream.getAudioTracks()[0],
+    );
     videoTransceiver = channels.videoTransceiver;
     screenAudioTransceiver = channels.screenAudioTransceiver;
+    if (screenStream || cameraTrack) {
+      await aplicarParametrosEnvioVideo(videoTransceiver?.sender, Boolean(screenStream));
+    }
+  }
+
+  async function aplicarParametrosEnvioVideo(sender, modoTela) {
+    if (!sender || typeof sender.getParameters !== 'function' || typeof sender.setParameters !== 'function') {
+      return;
+    }
+    try {
+      const parametros = sender.getParameters();
+      if (!parametros || !Array.isArray(parametros.encodings) || !parametros.encodings.length) return;
+      parametros.degradationPreference = modoTela ? 'maintain-resolution' : 'balanced';
+      const maxBitrate = modoTela ? 2500000 : 1500000;
+      for (const encoding of parametros.encodings) {
+        encoding.maxBitrate = maxBitrate;
+        encoding.maxFramerate = 30;
+      }
+      await sender.setParameters(parametros);
+    } catch (erro) {
+      console.warn('Não foi possível aplicar parâmetros de vídeo:', erro?.message || erro);
+    }
   }
 
   async function createPeerConnection() {
@@ -853,34 +953,44 @@
     videoTransceiver = null;
     screenAudioTransceiver = null;
     microphoneSender = null;
-    pc = new RTCPeerConnection({
+    const connection = new RTCPeerConnection({
       iceServers: CONFIG.ICE_SERVERS,
       iceCandidatePoolSize: 10,
     });
 
     // The answerer binds the offered channels after setRemoteDescription.
     // Empty channels created on both sides leave orphaned recvonly senders.
-    if (isInitiator) await bindLocalChannels();
+    if (isInitiator) await bindLocalChannels(connection);
     if (isInitiator) await applyMicrophoneVolume();
 
-    const connection = pc;
     profileChannel = null;
-    if (isInitiator) bindProfileChannel(connection.createDataChannel('profile'));
+    screenAudioChannel = null;
+    if (isInitiator) {
+      bindProfileChannel(connection.createDataChannel('profile'));
+      bindScreenAudioChannel(connection.createDataChannel('screen-audio', { ordered: false, maxRetransmits: 0 }));
+    }
     connection.ondatachannel = ({ channel }) => {
-      if (pc === connection && channel.label === 'profile') bindProfileChannel(channel);
+      if (pc !== connection) {
+        channel.close();
+        return;
+      }
+      if (channel.label === 'profile') bindProfileChannel(channel);
+      else if (channel.label === 'screen-audio') bindScreenAudioChannel(channel);
       else channel.close();
     };
 
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
+    connection.onicecandidate = (event) => {
+      if (pc === connection && event.candidate) {
         sendSignal({ type: 'candidate', candidate: event.candidate.toJSON() });
       }
     };
 
-    pc.ontrack = (event) => {
+    connection.ontrack = (event) => {
+      if (pc !== connection) return;
       if (event.track.kind === 'video') {
         remoteVideo.srcObject = new MediaStream([event.track]);
         remoteVideo.dataset.empty = 'false';
+        atualizarOrientacaoVideoRemoto();
         remoteTile.classList.toggle('has-video', remoteVideoEnabled ?? !event.track.muted);
         event.track.onunmute = () => {
           remoteTile.classList.toggle('has-video', remoteVideoEnabled ?? true);
@@ -891,7 +1001,7 @@
         remoteVideo.play().catch(() => {});
       } else if (event.track.kind === 'audio') {
         const mixer = ensureRemoteMixer();
-        const audioChannels = pc.getTransceivers().filter((channel) => channel.receiver.track.kind === 'audio');
+        const audioChannels = connection.getTransceivers().filter((channel) => channel.receiver.track.kind === 'audio');
         const channel = event.transceiver === audioChannels[0] ? 'voice' : 'screen';
         mixer.addTrack(event.track, channel);
         applyRemoteVolume();
@@ -899,9 +1009,8 @@
       }
     };
 
-    pc.onconnectionstatechange = () => {
+    connection.onconnectionstatechange = () => {
       if (pc !== connection) return;
-      console.log('[pc] connectionState:', pc.connectionState);
 
       if (pc.connectionState === 'connected') {
         clearTimeout(reconnectTimer);
@@ -922,7 +1031,7 @@
       }
     };
 
-    pc.oniceconnectionstatechange = () => {
+    connection.oniceconnectionstatechange = () => {
       if (pc !== connection) return;
       if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
         clearTimeout(iceFailureTimer);
@@ -939,12 +1048,20 @@
       }
     };
 
+    pc = connection;
     return pc;
   }
 
-  async function attemptIceRestart() {
-    if (!pc || !isInitiator) return; // so quem criou a offer original reinicia o ICE
-    if (pc.connectionState === 'connected') return;
+  async function attemptIceRestart(forceEvenIfConnected = false) {
+    if (!pc) return;
+    if (!forceEvenIfConnected && pc.connectionState === 'connected') return;
+    if (!isInitiator) {
+      const now = Date.now();
+      if (now - lastIceRestartRequestAt < 2000) return;
+      lastIceRestartRequestAt = now;
+      sendSignal({ type: 'renegotiate', iceRestart: true });
+      return;
+    }
     try {
       const offer = await pc.createOffer({ iceRestart: true });
       await pc.setLocalDescription(offer);
@@ -954,9 +1071,6 @@
     }
   }
 
-  // ---------------------------------------------------------------------
-  // Controles: mutar, camera, compartilhar tela, sair
-  // ---------------------------------------------------------------------
   btnMute.addEventListener('click', () => {
     if (!localStream) return;
     const track = localStream.getAudioTracks()[0];
@@ -981,6 +1095,14 @@
     applyMicrophoneVolume().catch((err) => console.error('Erro ajustando volume do microfone:', err));
   });
   navigator.mediaDevices.addEventListener('devicechange', refreshMicrophones);
+
+  function atualizarOrientacaoVideoRemoto() {
+    const ehRetrato = remoteVideo.videoWidth > 0 && remoteVideo.videoHeight > remoteVideo.videoWidth;
+    remoteTile.classList.toggle('video-portrait', ehRetrato);
+  }
+
+  remoteVideo.addEventListener('loadedmetadata', atualizarOrientacaoVideoRemoto);
+  remoteVideo.addEventListener('resize', atualizarOrientacaoVideoRemoto);
 
   remoteVideo.muted = true;
   remoteVolume.addEventListener('input', applyRemoteVolume);
@@ -1073,17 +1195,25 @@
       return;
     }
 
-    sourceGrid.innerHTML = '';
+    sourceGrid.replaceChildren();
     includeSystemAudio.checked = Boolean(screenAudioTrack);
     stopScreenShareButton.hidden = !screenStream;
     sources.forEach((source) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'source-option';
-      btn.innerHTML = `
-        <img src="${source.thumbnailDataUrl}" alt="" />
-        <span class="source-option-name">${escapeHtml(source.name)}</span>
-      `;
+
+      const img = document.createElement('img');
+      img.alt = '';
+      if (typeof source.thumbnailDataUrl === 'string' && source.thumbnailDataUrl.startsWith('data:image/')) {
+        img.src = source.thumbnailDataUrl;
+      }
+
+      const nameEl = document.createElement('span');
+      nameEl.className = 'source-option-name';
+      nameEl.textContent = source.name || '';
+
+      btn.append(img, nameEl);
       btn.addEventListener('click', () => {
         closeSourcePicker();
         startScreenShare(source.id, includeSystemAudio.checked, source.nativeAudioPid);
@@ -1096,7 +1226,7 @@
 
   function closeSourcePicker() {
     sourceModal.hidden = true;
-    sourceGrid.innerHTML = '';
+    sourceGrid.replaceChildren();
   }
 
   sourceModalClose.addEventListener('click', closeSourcePicker);
@@ -1130,7 +1260,8 @@
   async function replaceScreenShare(sourceId, includeAudio, nativeAudioPid) {
     const previousScreenStream = screenStream;
     const connection = pc;
-    const useNativeAudio = includeAudio && nativeAudioPid && window.electronAPI.startNativeAudio;
+    const includeNativeTarget = Boolean(includeAudio && nativeAudioPid);
+    const useNativeAudio = Boolean(includeAudio && window.electronAPI.startNativeAudio);
     let nextScreenStream;
     try {
       nextScreenStream = await navigator.mediaDevices.getUserMedia({
@@ -1162,10 +1293,14 @@
     }
 
     const screenTrack = screenStream.getVideoTracks()[0];
+    if ('contentHint' in screenTrack) screenTrack.contentHint = 'detail';
     await stopNativeAudioCapture();
     if (useNativeAudio) {
       try {
-        screenAudioTrack = await startNativeAudioCapture(nativeAudioPid);
+        screenAudioTrack = await startNativeAudioCapture(
+          includeNativeTarget ? nativeAudioPid : null,
+          includeNativeTarget,
+        );
         if (screenAudioTrack) screenStream.addTrack(screenAudioTrack);
       } catch (nativeError) {
         console.warn('WASAPI falhou; usando audio de sistema como fallback:', nativeError);
@@ -1186,11 +1321,12 @@
       screenAudioTrack = screenStream.getAudioTracks()[0] || null;
     }
 
-    // O coracao da troca: substitui a track de video no sender existente,
-    // sem precisar renegociar a offer/answer.
     const sender = pc && (videoTransceiver?.sender || pc.getSenders().find((s) => s.track?.kind === 'video'));
     try {
-      if (sender) await sender.replaceTrack(screenTrack);
+      if (sender) {
+        await sender.replaceTrack(screenTrack);
+        await aplicarParametrosEnvioVideo(sender, true);
+      }
     } catch (error) {
       nextScreenStream.getTracks().forEach((track) => track.stop());
       await stopNativeAudioCapture();
@@ -1219,7 +1355,6 @@
       previousScreenStream.getTracks().forEach((track) => track.stop());
     }
 
-    // Preview local passa a mostrar a tela compartilhada.
     localVideo.srcObject = screenStream;
     localTile.classList.add('screen-share');
     localTile.classList.add('has-video');
@@ -1250,7 +1385,10 @@
     screenAudioTrack = null;
 
     const sender = pc && (videoTransceiver?.sender || pc.getSenders().find((s) => s.track?.kind === 'video'));
-    if (sender) await sender.replaceTrack(cameraTrack || null);
+    if (sender) {
+      await sender.replaceTrack(cameraTrack || null);
+      if (cameraTrack) await aplicarParametrosEnvioVideo(sender, false);
+    }
 
     localVideo.srcObject = localStream;
     localTile.classList.remove('screen-share');
@@ -1265,6 +1403,8 @@
   function leaveCall() {
     if (document.fullscreenElement) document.exitFullscreen().catch(console.warn);
     setJoining(false);
+    clearTimeout(slowServerTimer);
+    slowServerTimer = null;
     roomCheckResolver?.({ error: true });
     roomCheckResolver = null;
     window.electronAPI.socketEmit('leave-room');
@@ -1276,6 +1416,8 @@
     remoteMixer = null;
     speakingIndicators.forEach((cleanup) => cleanup());
     speakingIndicators.clear();
+    speakingAudioContext?.close().catch(() => {});
+    speakingAudioContext = null;
     stopNativeAudioCapture().catch(() => {});
     stopMicrophoneVolume().catch(() => {});
     if (pc) pc.close();
@@ -1286,6 +1428,7 @@
     screenStream = null;
     remoteVideoEnabled = null;
     profileChannel = null;
+    screenAudioChannel = null;
     remoteProfile = { name: '', photo: '' };
     currentRoom = null;
     isInitiator = false;
@@ -1302,6 +1445,7 @@
     clearTimeout(iceFailureTimer);
     renegotiationQueued = false;
     renegotiationInProgress = false;
+    lastIceRestartRequestAt = 0;
     microphoneSender = null;
     remoteVideo.srcObject = null;
     remoteVideo.dataset.empty = 'true';
@@ -1322,24 +1466,23 @@
     closeSourcePicker();
     localTileLabel.textContent = 'Você';
     renderProfiles();
-    remoteTile.classList.remove('screen-share');
-    remoteTile.classList.remove('has-video');
+    remoteTile.classList.remove('screen-share', 'has-video', 'video-portrait');
     document.getElementById('remote-empty').textContent = 'Envie o código e espere sua companhia.';
 
     goToLobbyScreen();
   }
 
-  // ---------------------------------------------------------------------
-  // Lobby: entrar na sala
-  // ---------------------------------------------------------------------
   async function beginJoin(roomName, verifyRoom = false) {
     if (!roomName || joining) return;
     setJoining(true);
     setLobbyStatus('Conectando ao servidor...', 'info');
+    clearTimeout(slowServerTimer);
+    slowServerTimer = setTimeout(() => {
+      if (joining && !hasJoinedOnce) {
+        setLobbyStatus('Acordando servidor... aguarde um instante.', 'info');
+      }
+    }, 6000);
 
-    // IMPORTANTE: socketConnect() precisa vir antes de wireSocketEvents(),
-    // porque o wrapper exposto pelo preload so consegue registrar listeners
-    // (socketOn) depois que o objeto `socket` existe do lado do preload.
     currentRoom = roomName;
     window.electronAPI.socketConnect(CONFIG.SIGNALING_SERVER_URL);
     wireSocketEvents();
@@ -1348,13 +1491,15 @@
         const timer = setTimeout(() => {
           roomCheckResolver = null;
           resolve({ error: true });
-        }, 15000);
+        }, 30000);
         roomCheckResolver = (result) => {
           clearTimeout(timer);
           resolve(result);
         };
         window.electronAPI.socketEmit('check-room', roomName);
       });
+      clearTimeout(slowServerTimer);
+      slowServerTimer = null;
       if (roomResult.error || !roomResult.exists) {
         window.electronAPI.socketDisconnect();
         currentRoom = null;
@@ -1370,7 +1515,6 @@
         return;
       }
     }
-    // O Socket.IO enfileira este evento se a conexao ainda estiver abrindo.
     window.electronAPI.socketEmit('join-room', roomName);
   }
 
@@ -1405,12 +1549,5 @@
     }
   });
 
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-  }
-
-  // Permissoes de camera/microfone no macOS (no-op no Windows).
   window.electronAPI.checkMediaPermissions().catch(() => {});
 })();

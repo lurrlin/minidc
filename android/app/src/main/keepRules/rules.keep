@@ -1,0 +1,13 @@
+# Regras R8 / ProGuard do Unme para WebRTC (JNI) e Socket.IO
+
+-keep class org.webrtc.** { *; }
+-dontwarn org.webrtc.**
+
+-keep class io.socket.** { *; }
+-dontwarn io.socket.**
+-dontwarn okhttp3.**
+-dontwarn okio.**
+
+-keepclassmembers class com.example.unme.** {
+    @android.webkit.JavascriptInterface <methods>;
+}

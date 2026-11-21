@@ -1,13 +1,19 @@
 
 
 const { contextBridge, ipcRenderer } = require('electron');
-const { io } = require('socket.io-client');
 
-let socket = null;
+const socketListeners = new Map();
+let socketConnected = false;
+
+ipcRenderer.on('socket-event', (_event, eventName, ...args) => {
+  const callbacks = socketListeners.get(eventName);
+  if (!callbacks) return;
+  callbacks.forEach((callback) => callback(...args));
+});
 
 contextBridge.exposeInMainWorld('electronAPI', {
   getScreenSources: () => ipcRenderer.invoke('get-screen-sources'),
-  startNativeAudio: (pid) => ipcRenderer.invoke('start-native-audio', pid),
+  startNativeAudio: (pid, includeMode = true) => ipcRenderer.invoke('start-native-audio', pid, includeMode),
   stopNativeAudio: () => ipcRenderer.invoke('stop-native-audio'),
   onNativeAudioData: (callback) => {
     const listener = (_event, packet) => callback(packet);
@@ -18,27 +24,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
 
   socketConnect: (url) => {
-    if (socket) socket.disconnect();
-    socket = io(url, {
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-    });
+    socketListeners.clear();
+    socketConnected = true;
+    ipcRenderer.send('socket-connect', url);
     return true;
   },
   socketEmit: (event, payload) => {
-    if (!socket) return;
-    socket.emit(event, payload);
+    if (!socketConnected) return;
+    ipcRenderer.send('socket-emit', event, payload);
   },
   socketOn: (event, callback) => {
-    if (!socket) return;
-    socket.on(event, (...args) => callback(...args));
+    if (!socketConnected) return;
+    let callbacks = socketListeners.get(event);
+    if (!callbacks) {
+      callbacks = new Set();
+      socketListeners.set(event, callbacks);
+    }
+    callbacks.add(callback);
   },
   socketDisconnect: () => {
-    if (!socket) return;
-    socket.disconnect();
-    socket = null;
+    if (!socketConnected) return;
+    socketConnected = false;
+    socketListeners.clear();
+    ipcRenderer.send('socket-disconnect');
   },
 });

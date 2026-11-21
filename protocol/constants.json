@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "protocolVersion": {
+    "current": "1.0",
+    "target": "1.1"
+  },
+  "network": {
+    "defaultSignalingServerUrl": "https://minidc-vn9a.onrender.com",
+    "defaultStunServers": [
+      "stun:stun.l.google.com:19302",
+      "stun:stun1.l.google.com:19302"
+    ],
+    "iceCandidatePoolSize": 10
+  },
+  "room": {
+    "maxParticipants": 2,
+    "minLength": 1,
+    "maxLength": 40,
+    "generatedCodeLength": 16,
+    "generatedCodeAlphabet": "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*+-=",
+    "serverRoomKeyPrefix": "call:"
+  },
+  "signaling": {
+    "maxSignalPayloadBytes": 131072,
+    "validSignalTypes": [
+      "offer",
+      "answer",
+      "candidate",
+      "ready",
+      "screen-share-start",
+      "screen-share-stop",
+      "video-state",
+      "renegotiate"
+    ],
+    "timeoutsMs": {
+      "checkRoomCurrent": 15000,
+      "checkRoomRecommended": 30000,
+      "checkRoomSlowServerHint": 6000,
+      "iceDisconnectedBeforeRestart": 3000,
+      "iceCheckingWarning": 12000
+    }
+  },
+  "profile": {
+    "storageKey": "unme.profile.v1",
+    "dataChannelLabel": "profile",
+    "maxNameLength": 40,
+    "maxPhotoDataUrlLength": 60000,
+    "maxDataChannelPayloadLength": 60512,
+    "maxUploadFileBytes": 8388608,
+    "acceptedMimeTypes": [
+      "image/jpeg",
+      "image/png",
+      "image/webp"
+    ],
+    "avatarDimensionPx": 256,
+    "avatarBackgroundHex": "#1a1d2a",
+    "jpegQualities": [0.8, 0.6, 0.4],
+    "photoDataUrlRegex": "^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$"
+  },
+  "media": {
+    "transceiverOrder": [
+      "video:primary",
+      "audio:voice",
+      "audio:screen"
+    ],
+    "audio": {
+      "minVolumePercent": 0,
+      "maxVolumePercent": 200,
+      "defaultVolumePercent": 100,
+      "speakingThreshold": 14,
+      "processingOptions": [
+        "noiseSuppression",
+        "echoCancellation",
+        "autoGainControl"
+      ]
+    },
+    "screenAudioDataChannel": {
+      "label": "screen-audio",
+      "ordered": false,
+      "maxRetransmits": 0,
+      "codec": "ima-adpcm",
+      "sampleRateHz": 24000,
+      "channels": 1,
+      "frameDurationMs": 20,
+      "headerBytes": 12
+    }
+  }
+}

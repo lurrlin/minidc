@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unme.local/schemas/signal-payload.schema.json",
+  "title": "Unme SignalPayload",
+  "description": "Mensagens trocadas no evento Socket.IO 'signal' entre os dois participantes da sala.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "ready" },
+        "protocolVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+        "capabilities": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "screenAudioDataChannel": { "type": "boolean" },
+            "iceRestartRequest": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "sdp"],
+      "properties": {
+        "type": { "const": "offer" },
+        "sdp": {
+          "type": "object",
+          "required": ["type", "sdp"],
+          "properties": {
+            "type": { "const": "offer" },
+            "sdp": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "sdp"],
+      "properties": {
+        "type": { "const": "answer" },
+        "sdp": {
+          "type": "object",
+          "required": ["type", "sdp"],
+          "properties": {
+            "type": { "const": "answer" },
+            "sdp": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "candidate"],
+      "properties": {
+        "type": { "const": "candidate" },
+        "candidate": {
+          "type": "object",
+          "required": ["candidate"],
+          "properties": {
+            "candidate": { "type": "string" },
+            "sdpMid": { "type": ["string", "null"] },
+            "sdpMLineIndex": { "type": ["integer", "null"], "minimum": 0 },
+            "usernameFragment": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "enabled"],
+      "properties": {
+        "type": { "const": "video-state" },
+        "enabled": { "type": "boolean" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "screen-share-start" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "screen-share-stop" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "renegotiate" },
+        "iceRestart": { "type": "boolean" }
+      }
+    }
+  ]
+}

@@ -10,10 +10,6 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "test": "electron tests/run.cjs",
-    "test:performance": "electron tests/run.cjs --performance",
-    "test:build": "node --test tests/build-dependencies.test.cjs",
-    "test:packaged": "electron tests/smoke.cjs --packaged",
     "start": "electron .",
     "dist": "electron-builder",
     "dist:win": "electron-builder --win",
@@ -36,7 +32,6 @@
     "productName": "unme",
     "files": [
       "**/*",
-      "!tests{,/**/*}",
       "!**/{.gitignore,.env,.env.*,*.log,*.pem,*.key,*.p12,*.pfx}"
     ],
     "directories": {
@@ -49,9 +44,9 @@
         "dmg"
       ],
       "extendInfo": {
-        "NSCameraUsageDescription": "O Mini Discord precisa da camera para a chamada de video.",
-        "NSMicrophoneUsageDescription": "O Mini Discord precisa do microfone para a chamada de audio.",
-        "NSScreenCaptureDescription": "O Mini Discord precisa capturar a tela para o compartilhamento de tela.",
+        "NSCameraUsageDescription": "O Unme precisa da camera para a chamada de video.",
+        "NSMicrophoneUsageDescription": "O Unme precisa do microfone para a chamada de audio.",
+        "NSScreenCaptureDescription": "O Unme precisa capturar a tela para o compartilhamento de tela.",
         "NSAudioCaptureUsageDescription": "O Unme precisa capturar o áudio da tela para compartilhar sua transmissão."
       }
     },

@@ -2,7 +2,6 @@
 node_modules/
 dist/
 coverage/
-electron-app/tests/artifacts/
 *.log
 *.exe
 *.msi
