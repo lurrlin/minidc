@@ -50,9 +50,9 @@
         "dmg"
       ],
       "extendInfo": {
-        "NSCameraUsageDescription": "O Mini Discord precisa da camera para a chamada de video.",
-        "NSMicrophoneUsageDescription": "O Mini Discord precisa do microfone para a chamada de audio.",
-        "NSScreenCaptureDescription": "O Mini Discord precisa capturar a tela para o compartilhamento de tela.",
+        "NSCameraUsageDescription": "O Unme precisa da camera para a chamada de video.",
+        "NSMicrophoneUsageDescription": "O Unme precisa do microfone para a chamada de audio.",
+        "NSScreenCaptureDescription": "O Unme precisa capturar a tela para o compartilhamento de tela.",
         "NSAudioCaptureUsageDescription": "O Unme precisa capturar o áudio da tela para compartilhar sua transmissão."
       }
     },

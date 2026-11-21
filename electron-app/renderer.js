@@ -1027,7 +1027,6 @@
 
     connection.onconnectionstatechange = () => {
       if (pc !== connection) return;
-      console.log('[pc] connectionState:', pc.connectionState);
 
       if (pc.connectionState === 'connected') {
         clearTimeout(reconnectTimer);

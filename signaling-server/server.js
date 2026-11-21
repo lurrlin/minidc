@@ -1,5 +1,5 @@
 /**
- * Signaling Server - Mini Discord (2 usuarios)
+ * Signaling Server - Unme (2 usuarios)
  * ---------------------------------------------
  * Responsabilidade UNICA: colocar dois peers na mesma "sala" e repassar
  * SDP (offer/answer) e ICE candidates entre eles. NUNCA toca em audio/video
@@ -200,7 +200,7 @@ function limparBucketsExpirados(agora) {
 }
 
 app.get('/', (_req, res) => {
-  res.send('Mini Discord signaling server - online.');
+  res.send('Unme signaling server - online.');
 });
 
 // Util para checar rapidamente se o server esta de pe (Render/Railway health check)
