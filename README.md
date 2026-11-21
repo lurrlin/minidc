@@ -52,6 +52,6 @@ Na tela inicial, abra **Editar nome e foto** para escolher como você aparece na
 ## Documentação técnica
 
 - [Especificação oficial do protocolo (`v1.0` / `v1.1`)](protocol/SPEC.md)
-- [Guia de desenvolvimento e testes](docs/DEVELOPMENT.md)
+- [Guia de desenvolvimento](docs/DEVELOPMENT.md)
+- [Segurança e privacidade](docs/SECURITY-PRIVACY.md)
 - [Fluxo obrigatório para novas funcionalidades](docs/FEATURE-WORKFLOW.md)
-- [Roteiro manual de interoperabilidade 2×2](tests/interop/CHECKLIST-INTEROP.md)

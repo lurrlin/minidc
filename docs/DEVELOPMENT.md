@@ -46,11 +46,9 @@ protocol/
   SPEC.md            Especificação única do protocolo v1.0 / v1.1
   constants.json     Limites, timeouts, alfabeto, STUN default e codec screen-audio
   schemas/           JSON Schemas de sinalização e RTCDataChannel
-  fixtures/          Casos de teste compartilhados consumidos em JS e Java
 
 signaling-server/
   server.js          Salas de até 2 participantes; rate limit, validação de sinal e logs mascarados
-  tests/             Testes automatizados com Socket.IO real
   package-lock.json  Dependências reproduzíveis
 
 electron-app/
@@ -64,70 +62,40 @@ electron-app/
   renderer.js        Ciclo da chamada, dispositivos, adaptação vertical e controles
   index.html         Interface em português
   style.css          Tema, layouts e estados visuais
-  tests/             Contratos, regressões no Chromium real, UI, smoke e performance
 
 android/
   app/src/main/java/com/example/unme/
                      MainActivity, ServicoChamada, MotorChamadaWebRtc, ClienteSinalizacao,
                      MisturadorAudio, CapturadorAudioSistema, CodecAdpcm, RenderizadorTexturaVideo,
                      GerenciadorDispositivosAudio, GerenciadorPerfil, GerenciadorSala, ConfiguracaoApp
-  app/src/test/      Testes unitários e validação das fixtures compartilhadas de protocol/
-
-tests/interop/
-  signaling-interop.test.cjs   Handshake e reconexão multiplataforma Desktop ↔ Android
-  CHECKLIST-INTEROP.md         Roteiro manual 2×2 em aparelhos reais
 ```
 
 A conexão negocia três canais `sendrecv`: vídeo (`video:primary`), voz (`audio:voice`) e áudio da tela (`audio:screen`). Quando o Android transmite áudio da tela, o fluxo PCM é comprimido em IMA-ADPCM 4-bit mono 24 kHz e enviado pelo `DataChannel` `"screen-audio"`, mantendo controle independente de volume no receptor. O primeiro participante cria os canais; o segundo reutiliza os canais da oferta antes de responder. A troca câmera/tela usa `replaceTrack`/`setTrack`, sem nova sala.
 
 O áudio remoto passa por fontes separadas de Web Audio (Desktop) ou `AudioTrack` nativos identificados por `mid` (Android), preservando ganho `0%–200%`, `deafen` e indicador de fala apenas para a voz.
 
-## Testes
-
-```powershell
-# Servidor de sinalização
-npm --prefix signaling-server test
-
-# Desktop (contratos, regressão/UI no Chromium e build)
-npm --prefix electron-app run test:contract
-npm --prefix electron-app test
-npm --prefix electron-app run test:build
-
-# Android (unitários + contratos + APK debug)
-cd android ; .\gradlew.bat testDebugUnitTest assembleDebug ; cd ..
-
-# Interoperabilidade multiplataforma
-node --test tests/interop/signaling-interop.test.cjs
-```
-
-Os testes do Desktop usam o Chromium incluído no Electron, vídeo gerado por canvas e dispositivos simulados. Os do servidor e os de interoperabilidade abrem uma porta local aleatória com Socket.IO real. Os testes do Android validam regras de negócio, ADPCM, roteamento de mídia e todas as fixtures de `protocol/fixtures/`. Consulte [CHECKLIST-INTEROP.md](../tests/interop/CHECKLIST-INTEROP.md) para validação física 2×2.
-
-### Desempenho e encerramento de chamadas
-
-Em `electron-app/`, execute `npm run test:performance`. O teste mantém duas transmissões simultâneas de canvas em 1280 × 720 a 30 fps por 30 segundos no renderer de produção e gera `tests/artifacts/performance.json`.
-
 ### Marca e ícone
 
 Abra `docs/icon.html` no navegador para visualizar e baixar o símbolo `ü` em PNG transparente de 1024 × 1024 pixels. Os dois pontos representam os participantes. O PNG e o ICO usados no app e no instalador ficam em `electron-app/assets/`.
 
-Para exportar novamente o PNG a partir da página, execute `npx electron tests/export-icon.cjs` em `electron-app/`. Ao alterar a marca, atualize também o ICO com os tamanhos 16, 24, 32, 48, 64, 128 e 256 pixels antes de gerar o instalador.
-
 ### Dependências e auditoria de segurança
 
-O Desktop usa Electron 44 e electron-builder 26 (Windows 64 bits / macOS 13+). Execute `npm audit` tanto em `electron-app/` quanto em `signaling-server/` para conferir os avisos conhecidos das dependências instaladas. O override de `global-agent` para 4.1.3 é verificado em `npm run test:build`.
+O Desktop usa Electron 44 e electron-builder 26 (Windows 64 bits / macOS 13+). Execute `npm audit` tanto em `electron-app/` quanto em `signaling-server/` para conferir os avisos conhecidos das dependências instaladas. O override de `global-agent` para 4.1.3 mantém o downloader do builder livre da cadeia antiga de logging vulnerável. No servidor, `npm run dev` usa `node --watch server.js`.
 
-Depois de gerar o instalador Windows, execute `npm run test:packaged` para validar o `app.asar` empacotado. No servidor, `npm run dev` usa `node --watch server.js`.
-
-## Gerar instalador
+## Gerar builds
 
 ```powershell
+# Desktop (instalador Windows / macOS)
 cd electron-app
 npm run dist:win
-# No macOS:
-npm run dist:mac
+# ou: npm run dist:mac
+
+# Android (APK debug)
+cd ../android
+.\gradlew.bat assembleDebug
 ```
 
-Os arquivos saem em `electron-app/dist/`.
+Os arquivos de saída ficam em `electron-app/dist/` e `android/app/build/outputs/apk/debug/`.
 
 ## Servidor hospedado
 

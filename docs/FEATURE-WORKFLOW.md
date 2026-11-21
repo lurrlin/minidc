@@ -22,7 +22,7 @@ Se qualquer resposta for **não**, a funcionalidade está fora do escopo do Unme
 1. **Definir o comportamento esperado**
    - Descreva o fluxo do usuário, estados visuais, limites numéricos, textos em português e casos de erro em 1 página.
 2. **Identificar regras de negócio compartilhadas**
-   - Validações, limites e cálculos idênticos entre JS e Java devem ser adicionados a [`protocol/constants.json`](../protocol/constants.json) e exemplificados em [`protocol/fixtures/`](../protocol/fixtures/).
+   - Validações, limites e cálculos idênticos entre JS e Java devem ser adicionados a [`protocol/constants.json`](../protocol/constants.json).
 3. **Identificar alterações necessárias no protocolo**
    - Defina se há novos campos em `SignalPayload`, novos eventos ou mensagens em `RTCDataChannel`.
    - Atualize [`protocol/SPEC.md`](../protocol/SPEC.md) e [`protocol/schemas/`](../protocol/schemas/).
@@ -36,7 +36,7 @@ Se qualquer resposta for **não**, a funcionalidade está fora do escopo do Unme
    - Mapeie permissões em tempo de execução, ciclo de vida (`MainActivity`/`ServicoChamada`), APIs nativas (`MediaProjection`, `AudioManager`, `Camera2`), layouts XML e nomenclatura em português.
 7. **Implementar uma plataforma por vez com commits pequenos**
    - Trabalhe sempre em branch separada, com commits atômicos e em português (ex.: primeiro `protocol/`, depois `android/`, depois `electron-app/`, depois `signaling-server/`).
-8. **Executar testes de contrato e interoperabilidade**
-   - Rode os testes automatizados do servidor (`npm test`), Desktop (`npm test`), Android (`./gradlew testDebugUnitTest assembleDebug`) e valide a matriz 2×2 (Desktop↔Desktop, Desktop↔Android, Android↔Desktop, Android↔Android).
+8. **Validar builds e interoperabilidade**
+   - Gere os pacotes de Desktop (`npm run dist:win`) e Android (`./gradlew.bat assembleDebug`) e valide manualmente Desktop ↔ Android em aparelhos reais.
 9. **Atualizar documentação**
-   - Atualize `README.md`, `docs/DEVELOPMENT.md`, `protocol/SPEC.md` e o checklist de interoperabilidade no mesmo ciclo da entrega.
+   - Atualize `README.md`, `docs/DEVELOPMENT.md` e `protocol/SPEC.md` no mesmo ciclo da entrega.

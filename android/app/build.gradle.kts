@@ -14,8 +14,6 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -40,8 +38,4 @@ dependencies {
     implementation(libs.socketio.client) {
         exclude(group = "org.json", module = "json")
     }
-    testImplementation(libs.junit)
-    testImplementation(libs.org.json)
-    androidTestImplementation(libs.espresso.core)
-    androidTestImplementation(libs.ext.junit)
 }
