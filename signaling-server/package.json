@@ -1,6 +1,6 @@
 {
   "name": "mini-discord-signaling-server",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Servidor de sinalizacao (Socket.IO) para o Unme P2P - apenas troca SDP/ICE, nunca transporta audio/video.",
   "main": "server.js",
   "private": true,
