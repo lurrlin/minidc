@@ -659,7 +659,16 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
                 return;
             }
             if (!emTelaCheia) {
-                quadroExpandido = (quadroExpandido == 1) ? 0 : 1;
+                boolean modoPaisagem = getResources().getConfiguration().orientation
+                        == Configuration.ORIENTATION_LANDSCAPE;
+                int destaqueAtual = (quadroExpandido == 0 && modoPaisagem && telaRemotaEmCompartilhamento)
+                        ? 1
+                        : quadroExpandido;
+                if (destaqueAtual == 1) {
+                    quadroExpandido = (modoPaisagem && telaRemotaEmCompartilhamento) ? -1 : 0;
+                } else {
+                    quadroExpandido = 1;
+                }
                 aplicarLayoutPalco();
             }
         });
@@ -743,6 +752,13 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
 
     private void definirTelaCheia(boolean ativar) {
         emTelaCheia = ativar;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            WindowManager.LayoutParams atributosJanela = getWindow().getAttributes();
+            atributosJanela.layoutInDisplayCutoutMode = ativar
+                    ? WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    : WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT;
+            getWindow().setAttributes(atributosJanela);
+        }
         WindowInsetsControllerCompat controladorBarras =
                 WindowCompat.getInsetsController(getWindow(), containerRaiz);
         if (controladorBarras != null) {
@@ -766,7 +782,18 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
         if (videoRemoto == null) {
             return;
         }
-        if (emTelaCheia || telaRemotaEmCompartilhamento) {
+        boolean modoPaisagem = getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_LANDSCAPE;
+
+        if (modoPaisagem && (emTelaCheia || telaRemotaEmCompartilhamento)) {
+            videoRemoto.setScalingType(
+                    RendererCommon.ScalingType.SCALE_ASPECT_FILL,
+                    RendererCommon.ScalingType.SCALE_ASPECT_FIT
+            );
+            containerVideoRemoto.setBackgroundColor(
+                    ContextCompat.getColor(this, R.color.cor_fundo_tela_compartilhada)
+            );
+        } else if (emTelaCheia || telaRemotaEmCompartilhamento) {
             videoRemoto.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
             containerVideoRemoto.setBackgroundColor(
                     ContextCompat.getColor(this, R.color.cor_fundo_tela_compartilhada)
@@ -812,13 +839,16 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
 
         LinearLayout.LayoutParams paramsRemoto;
         LinearLayout.LayoutParams paramsLocal;
+        int destaqueEfetivo = (quadroExpandido == 0 && modoPaisagem && telaRemotaEmCompartilhamento)
+                ? 1
+                : quadroExpandido;
 
         if (modoPaisagem) {
-            if (quadroExpandido == 1) {
+            if (destaqueEfetivo == 1) {
                 paramsRemoto = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
-                paramsLocal = new LinearLayout.LayoutParams(dpParaPx(165), dpParaPx(150), 0f);
+                paramsLocal = new LinearLayout.LayoutParams(dpParaPx(150), dpParaPx(135), 0f);
                 paramsLocal.gravity = Gravity.BOTTOM;
-            } else if (quadroExpandido == 2) {
+            } else if (destaqueEfetivo == 2) {
                 paramsRemoto = new LinearLayout.LayoutParams(dpParaPx(165), dpParaPx(150), 0f);
                 paramsRemoto.gravity = Gravity.BOTTOM;
                 paramsLocal = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
@@ -827,11 +857,11 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
                 paramsLocal = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
             }
         } else {
-            if (quadroExpandido == 1) {
+            if (destaqueEfetivo == 1) {
                 paramsRemoto = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
                 paramsLocal = new LinearLayout.LayoutParams(dpParaPx(165), dpParaPx(132), 0f);
                 paramsLocal.gravity = Gravity.END;
-            } else if (quadroExpandido == 2) {
+            } else if (destaqueEfetivo == 2) {
                 paramsRemoto = new LinearLayout.LayoutParams(dpParaPx(165), dpParaPx(132), 0f);
                 paramsRemoto.gravity = Gravity.END;
                 paramsLocal = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
@@ -849,6 +879,7 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
         aplicarLayoutPalco();
+        atualizarEscalaVideoRemoto();
         if (motorChamada != null) {
             motorChamada.atualizarOrientacaoCapturaTela();
         }
@@ -1265,6 +1296,7 @@ public class MainActivity extends AppCompatActivity implements MotorChamadaWebRt
         containerVideoRemoto.setVisibility(possuiVideo ? View.VISIBLE : View.GONE);
         containerAvatarRemoto.setVisibility(possuiVideo ? View.GONE : View.VISIBLE);
         textoVazioRemoto.setVisibility(possuiVideo ? View.GONE : View.VISIBLE);
+        aplicarLayoutPalco();
         atualizarEscalaVideoRemoto();
     }
 
