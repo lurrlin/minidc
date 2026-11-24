@@ -1,57 +1,59 @@
 # Unme
 
-Um espaço para conversar, ver e compartilhar. Só vocês dois.
+[Versão em Português](README.pt-br.md)
 
-O Unme é um aplicativo **multiplataforma** (**Desktop Windows/macOS** e **Android**) para chamadas de voz, vídeo e compartilhamento bidirecional de tela entre **exatamente duas pessoas**, sem contas, sem chat de texto e sem banco de dados de conversas.
+A space to talk, watch, and share. Just the two of you.
 
-**[Baixar o Unme para Windows →](https://github.com/lurrlin/minidc/releases)**
+Unme is a **cross-platform** application (**Windows/macOS Desktop** and **Android**) for voice calls, video calls, and bidirectional screen sharing between **exactly two people**, with no accounts, no text chat, and no conversation database.
 
-## Plataformas
+**[Download Unme for Windows →](https://github.com/lurrlin/minidc/releases)**
 
-- **Desktop (`electron-app/`):** Electron com WebRTC nativo do Chromium, captura de áudio de janela via WASAPI (`electron-native-screenshare`) e mixagem independente com Web Audio API.
-- **Android (`android/`):** aplicativo nativo em Java (`minSdk 24`, Android 7.0+) com WebRTC (`stream-webrtc-android`), alternância entre câmera frontal e traseira, `MediaProjection` para tela compartilhada, adaptação automática ao girar o aparelho e captura opcional de áudio interno (Android 10+).
-- **Servidor de sinalização (`signaling-server/`):** Node.js + Socket.IO usado apenas para reunir as duas pessoas na sala e trocar metadados de conexão (SDP/ICE).
+## Platforms
 
-Desktop e Android interoperam diretamente na mesma sala usando o contrato compartilhado em [especificação do protocolo](protocol/SPEC.md).
+- **Desktop (`electron-app/`):** Electron with native Chromium WebRTC, per-window audio capture via WASAPI (`electron-native-screenshare`), and independent audio mixing with the Web Audio API.
+- **Android (`android/`):** Native Java application (`minSdk 24`, Android 7.0+) using WebRTC (`stream-webrtc-android`), front/rear camera switching, `MediaProjection` for screen sharing, automatic orientation handling, and optional internal audio capture (Android 10+).
+- **Signaling Server (`signaling-server/`):** Node.js + Socket.IO used strictly to pair both participants in a room and exchange connection metadata (SDP/ICE).
 
-## Começar uma chamada
+Desktop and Android interoperate directly within the same room using the shared contract defined in the [protocol specification](protocol/SPEC.md).
 
-1. Clique ou toque em **Criar sala**.
-2. Copie o código da sala e envie para sua companhia.
-3. A outra pessoa escolhe **Entrar em uma sala**, cola o código e confirma.
-4. A chamada conecta quando os dois estão na sala.
+## Starting a Call
 
-Cada sala recebe no máximo **2 pessoas**. A câmera começa desligada e pode ser ligada a qualquer momento durante a chamada. Compartilhe o código apenas com quem você quer convidar.
+1. Click or tap **Create room**.
+2. Copy the room code and send it to your partner.
+3. The other person selects **Join a room**, pastes the code, and confirms.
+4. The call connects automatically once both participants are in the room.
 
-## Seu perfil
+Each room allows a maximum of **2 people**. The camera starts off by default and can be enabled at any time during the call. Share the room code only with the person you want to invite.
 
-Na tela inicial, abra **Editar nome e foto** para escolher como você aparece na chamada:
+## Your Profile
 
-- Digite seu nome (até **40 caracteres**) e escolha uma foto **JPG, PNG ou WebP** de até **8 MB**.
-- A foto é recortada e compactada localmente para **256 × 256** antes de salvar.
-- O nome e a foto ficam salvos apenas neste dispositivo (`unme.profile.v1`), com backup em nuvem desativado no Android (`allowBackup="false"`), e são enviados diretamente ao outro participante por `RTCDataChannel` P2P.
+On the home screen, open **Edit name and photo** to customize how you appear during calls:
 
-## Controles da chamada
+- Enter a display name (up to **40 characters**) and pick a **JPG, PNG, or WebP** image up to **8 MB**.
+- The image is cropped and compressed locally to **256 × 256** before saving.
+- Your name and photo are stored exclusively on your device (`unme.profile.v1`), with cloud backup disabled on Android (`allowBackup="false"`), and are transmitted directly to the other participant over a P2P `RTCDataChannel`.
 
-| Controle | Desktop | Android |
+## Call Controls
+
+| Control | Desktop | Android |
 | --- | --- | --- |
-| **Microfone** | Silencia ou reativa sua voz. | Silencia ou reativa sua voz. |
-| **Câmera** | Liga ou desliga a webcam. | Liga/desliga a câmera e exibe **Trocar câmera** (frontal/traseira) quando ativa. |
-| **Tela** | Escolhe monitor/janela e opcionalmente captura áudio. | Compartilha a tela inteira e opcionalmente áudio interno (Android 10+; apps DRM podem silenciar). |
-| **Ouvir** | Silencia toda a saída recebida sem mutar seu microfone. | Silencia toda a saída recebida sem mutar seu microfone. |
-| **Volumes remotos** | Botão direito (M2) no quadro da companhia para **Voz da pessoa** e **Áudio da transmissão** (`0%–200%`). | Botão **Volume** / toque longo no quadro remoto com os mesmos dois sliders (`0%–200%`). |
-| **Tela cheia / Destaque** | Clique no quadro para destacar; **Tela cheia** ou `Escape`. | Toque para destacar; botão **Tela cheia** e botão Voltar do sistema. |
-| **Configurações ⚙** | Dispositivos, ganho de entrada/saída e NS/AEC/AGC verificados. | Dispositivos (incluindo Bluetooth), ganho de entrada/saída e NS/AEC/AGC verificados. |
+| **Microphone** | Mutes or unmutes your voice. | Mutes or unmutes your voice. |
+| **Camera** | Toggles your webcam on or off. | Toggles the camera and shows **Switch camera** (front/rear) while active. |
+| **Screen** | Selects a monitor or window and optionally captures its audio. | Shares the full screen and optionally captures internal audio (Android 10+; DRM-protected apps may mute audio). |
+| **Mute Output** | Mutes all incoming audio without muting your microphone. | Mutes all incoming audio without muting your microphone. |
+| **Remote Volumes** | Right-click (M2) on your partner's video frame to adjust **Peer voice** and **Stream audio** (`0%–200%`). | **Volume** button / long-press on the remote frame with the same two sliders (`0%–200%`). |
+| **Fullscreen / Spotlight** | Click a frame to spotlight it; **Fullscreen** button or `Escape` to exit. | Tap to spotlight; **Fullscreen** button or system Back button to exit. |
+| **Settings ⚙** | Audio devices, input/output gain, and verified NS/AEC/AGC processing. | Audio devices (including Bluetooth), input/output gain, and verified NS/AEC/AGC processing. |
 
-## Privacidade e segurança
+## Privacy and Security
 
-- O conteúdo de áudio, vídeo, tela e perfil trafega criptografado ponto a ponto via WebRTC (**DTLS-SRTP** / **SCTP**) sem passar pelo servidor de sinalização e nunca é gravado.
-- O servidor de sinalização registra códigos de sala apenas de forma opaca por hash efêmero de sessão, aplica limites de taxa contra enumeração e valida os payloads de sinalização.
-- Detalhes transparentes do modelo de ameaças estão em [segurança e privacidade](docs/SECURITY-PRIVACY.md).
+- Audio, video, screen share, and profile payloads are encrypted end-to-end via WebRTC (**DTLS-SRTP** / **SCTP**), never pass through the signaling server, and are never recorded.
+- The signaling server logs room codes only opaquely using an ephemeral session hash, enforces rate limits against room enumeration, and validates all signaling payloads.
+- Full details on the threat model are documented in [security and privacy](docs/SECURITY-PRIVACY.md).
 
-## Documentação técnica
+## Technical Documentation
 
-- [Especificação oficial do protocolo (`v1.0` / `v1.1`)](protocol/SPEC.md)
-- [Guia de desenvolvimento](docs/DEVELOPMENT.md)
-- [Segurança e privacidade](docs/SECURITY-PRIVACY.md)
-- [Fluxo obrigatório para novas funcionalidades](docs/FEATURE-WORKFLOW.md)
+- [Official Protocol Specification (`v1.0` / `v1.1`)](protocol/SPEC.md)
+- [Development Guide](docs/DEVELOPMENT.md)
+- [Security and Privacy](docs/SECURITY-PRIVACY.md)
+- [Mandatory Workflow for New Features](docs/FEATURE-WORKFLOW.md)
