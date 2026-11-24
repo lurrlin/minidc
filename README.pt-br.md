@@ -6,6 +6,10 @@ O Unme é um aplicativo **multiplataforma** (**Desktop Windows/macOS** e **Andro
 
 **[Baixar o Unme para Windows →](https://github.com/lurrlin/minidc/releases)**
 
+| Tela Inicial e Perfil | Chamada Ativa e Compartilhamento de Tela |
+| :---: | :---: |
+| ![Unme Tela Inicial](https://github.com/user-attachments/assets/b9dad19c-beb0-4b02-ad3a-8587e4cc392e) | ![Unme Chamada](https://github.com/user-attachments/assets/00cdd292-850b-43d4-85ef-62b4daf7179c) |
+
 ## Plataformas
 
 - **Desktop (`electron-app/`):** Electron com WebRTC nativo do Chromium, captura de áudio de janela via WASAPI (`electron-native-screenshare`) e mixagem independente com Web Audio API.
