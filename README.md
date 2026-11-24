@@ -14,7 +14,7 @@ Unme is a **cross-platform** application (**Windows/macOS Desktop** and **Androi
 - **Android (`android/`):** Native Java application (`minSdk 24`, Android 7.0+) using WebRTC (`stream-webrtc-android`), front/rear camera switching, `MediaProjection` for screen sharing, automatic orientation handling, and optional internal audio capture (Android 10+).
 - **Signaling Server (`signaling-server/`):** Node.js + Socket.IO used strictly to pair both participants in a room and exchange connection metadata (SDP/ICE).
 
-Desktop and Android interoperate directly within the same room using the shared contract defined in the [protocol specification](protocol/SPEC.md).
+Desktop and Android interoperate directly within the same room using the shared contract defined in the [protocol specification](protocol/SPEC-en.md).
 
 ## Starting a Call
 
@@ -49,7 +49,7 @@ On the home screen, open **Edit name and photo** to customize how you appear dur
 
 - Audio, video, screen share, and profile payloads are encrypted end-to-end via WebRTC (**DTLS-SRTP** / **SCTP**), never pass through the signaling server, and are never recorded.
 - The signaling server logs room codes only opaquely using an ephemeral session hash, enforces rate limits against room enumeration, and validates all signaling payloads.
-- Full details on the threat model are documented in [security and privacy](docs/SECURITY-PRIVACY.md).
+- Full details on the threat model are documented in [security and privacy](docs/SECURITY-PRIVACY-en.md).
 
 ## Technical Documentation
 
