@@ -10,7 +10,7 @@ Unme is a **cross-platform** application (**Windows/macOS Desktop** and **Androi
 
 | Lobby & Profile | Active Call & Screen Share |
 | :---: | :---: |
-| ![Unme Lobby](<img width="1023" height="683" alt="image" src="https://github.com/user-attachments/assets/b9dad19c-beb0-4b02-ad3a-8587e4cc392e" />) | ![Unme Call](<img width="1024" height="536" alt="image" src="https://github.com/user-attachments/assets/00cdd292-850b-43d4-85ef-62b4daf7179c" />) |
+| ![Unme Lobby](https://github.com/user-attachments/assets/b9dad19c-beb0-4b02-ad3a-8587e4cc392e) | ![Unme Call](https://github.com/user-attachments/assets/00cdd292-850b-43d4-85ef-62b4daf7179c) |
 
 ## Platforms
 
