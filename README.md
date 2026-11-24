@@ -53,7 +53,7 @@ On the home screen, open **Edit name and photo** to customize how you appear dur
 
 ## Technical Documentation
 
-- [Official Protocol Specification (`v1.0` / `v1.1`)](protocol/SPEC.md)
-- [Development Guide](docs/DEVELOPMENT.md)
-- [Security and Privacy](docs/SECURITY-PRIVACY.md)
-- [Mandatory Workflow for New Features](docs/FEATURE-WORKFLOW.md)
+- [Official Protocol Specification (`v1.0` / `v1.1`)](protocol/SPEC-en.md)
+- [Development Guide](docs/DEVELOPMENT-en.md)
+- [Security and Privacy](docs/SECURITY-PRIVACY-en.md)
+- [Mandatory Workflow for New Features](docs/FEATURE-WORKFLOW-en.md)
