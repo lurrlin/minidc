@@ -26,14 +26,14 @@ This document transparently describes what data Unme transmits, what it stores, 
 ## 3. Privacy Controls by Component
 
 - **Signaling Server (`signaling-server/`):**
-  - Hard room capacity capped at `2` participants[cite: 12].
-  - No database connected[cite: 12].
-  - Maximum payload cap (`128 KB`) and strict allowlist of signaling message types[cite: 12].
-  - Hardening plan (Stage 4): `roomName` masking in logs, per-socket/IP rate limiting, and structural validation per signal type[cite: 12].
+  - Hard room capacity capped at `2` participants.
+  - No database connected.
+  - Maximum payload cap (`128 KB`) and strict allowlist of signaling message types.
+  - Implemented hardening: ephemeral session hash masking for `roomName` in logs, rate limiting against room enumeration, and structural validation per signal type.
 - **Desktop (`electron-app/`):**
-  - `contextIsolation: true`, `nodeIntegration: false`, blocked external navigation and new window creation[cite: 12].
-  - Profile saved strictly in Electron local storage[cite: 12].
-  - Hardening plan (Stage 3): move `socket.io-client` to the main process and enable `sandbox: true`[cite: 12].
+  - `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`, blocked external navigation and new window creation.
+  - `socket.io-client` isolated in the main process (`main.js`) behind an explicit IPC bridge in `preload.js`.
+  - Profile saved strictly in Electron local storage.
 - **Android (`android/`):**
-  - Screen capture always requires explicit OS user consent (`MediaProjection`) and a persistent foreground notification (`ServicoChamada`)[cite: 12].
-  - Hardening plan (Stage 2): `android:allowBackup="false"` to prevent local profile extraction via cloud backups[cite: 12].
+  - Screen capture always requires explicit OS user consent (`MediaProjection`) and a persistent foreground notification (`ServicoChamada`).
+  - `android:allowBackup="false"` enabled to prevent local profile extraction via cloud backups.
