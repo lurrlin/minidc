@@ -29,11 +29,11 @@ Este documento descreve de forma transparente o que o Unme transporta, o que arm
   - Capacidade máxima fixa em `2` participantes por sala.
   - Nenhum banco de dados conectado.
   - Trava de tamanho máximo (`128 KB`) e whitelist estrita de tipos de sinal.
-  - Plano de endurecimento (Etapa 4): mascaramento de `roomName` em logs, rate limiting por socket/IP e validação estrutural por tipo de sinal.
+  - Endurecimento aplicado: mascaramento de `roomName` por hash efêmero em logs, rate limiting contra enumeração e validação estrutural por tipo de sinal.
 - **Desktop (`electron-app/`):**
-  - `contextIsolation: true`, `nodeIntegration: false`, bloqueio de navegação externa e abertura de novas janelas.
+  - `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`, bloqueio de navegação externa e abertura de novas janelas.
+  - Cliente `socket.io-client` isolado no processo principal (`main.js`) atrás de uma ponte IPC explícita no `preload.js`.
   - Perfil salvo apenas no armazenamento local do Electron.
-  - Plano de endurecimento (Etapa 3): mover `socket.io-client` para o processo principal e ativar `sandbox: true`.
 - **Android (`android/`):**
   - Captura de tela sempre exige confirmação explícita do sistema operacional (`MediaProjection`) e notificação persistente (`ServicoChamada`).
-  - Plano de endurecimento (Etapa 2): `android:allowBackup="false"` para impedir cópia do perfil local em backups de nuvem.
+  - `android:allowBackup="false"` ativo para impedir cópia do perfil local em backups de nuvem.
